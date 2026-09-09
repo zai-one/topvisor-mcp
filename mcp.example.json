@@ -1,0 +1,7 @@
+{
+  "env": {
+    "TOPVISOR_USER_ID": "YOUR_NUMERIC_USER_ID",
+    "TOPVISOR_API_KEY_FILE": "secrets/api.token",
+    "TOPVISOR_STATE_PATH": "state/topvisor.sqlite"
+  }
+}
