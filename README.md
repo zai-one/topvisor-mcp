@@ -2,15 +2,19 @@
 
 # Topvisor MCP
 
-Topvisor projects, keywords and saved search positions.
+MCP server for managing Topvisor projects and keyword lists. An AI assistant can organise keywords, configure search regions and read saved ranking history.
 
-Install it on your own computer or server and connect an MCP client. No AI Kit or
-central ZAI platform installation is required. Provider credentials and API access
-are required; provider charges and account restrictions still apply.
+## What you can do
+
+- Read projects, keywords, folders, groups and search settings.
+- Create projects and groups, import keywords, and set target URLs and tags.
+- Retrieve saved positions with `topvisor_positions_history`.
 
 ## Quick start
 
 Install Python 3.12+ (below 3.15), [uv](https://docs.astral.sh/uv/getting-started/installation/) and Git.
+
+You need your Topvisor user ID and API key. The wizard saves the key in a private local file.
 
 ```sh
 git clone https://github.com/zai-one/topvisor-mcp.git
@@ -25,12 +29,9 @@ The last command starts stdio and waits for an MCP client; it is not an interact
 See [INSTALL.md](INSTALL.md) for credentials, client configuration, HTTP and package integration.
 `--check-config` checks local settings only; it never validates a provider account over the network.
 
-## Included in 0.2.0
+## Scope and limits
 
-Read saved positions with topvisor_positions_history; region_indexes are indexes from project setup, not geographic region codes. Paid position checks are not exposed.
-
-Existing tool names and schemas remain supported. Writes and paid operations retain
-their server policy and approval controls. See [runtime configuration](docs/RUNTIME.md).
+Writes default to a preview and require explicit enabling to change project data. Deletion and launching paid position checks are not exposed. History requests use region indexes from the project settings, not geographic region codes. See [write and access settings](docs/RUNTIME.md).
 
 ## Verification
 
