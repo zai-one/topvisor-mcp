@@ -18,9 +18,14 @@ def units(value):
         raise ValueError("cost must be a bounded nonnegative decimal")
     try:
         amount = Decimal(str(value))
-        if not amount.is_finite() or not 0 <= amount <= 1000000 or amount * 1000000 != int(amount * 1000000):
+        if not amount.is_finite() or not 0 <= amount <= 1000000:
+            raise ValueError("cost is outside the supported range")
+        digits = amount.as_tuple()
+        if digits.exponent < -6:
             raise ValueError("cost must have at most six decimal places")
-        return int(amount * 1000000)
+        coefficient = int("".join(str(digit) for digit in digits.digits))
+        # Integer arithmetic cannot underflow or round under the Decimal context.
+        return coefficient * 10 ** (digits.exponent + 6) if coefficient else 0
     except (InvalidOperation, OverflowError) as exc:
         raise ValueError("invalid cost") from exc
 

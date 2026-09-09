@@ -231,7 +231,9 @@ async def test_explicit_approval_cost_change_and_expiry(config):
     assert not any(u.endswith("/go") for u, _, _ in provider.calls)
 
 
-@pytest.mark.parametrize("value", [True, None, "nan", "inf", "-0.1", "0.0000001", "1000001", "x"])
+@pytest.mark.parametrize(
+    "value", [True, None, "nan", "inf", "-0.1", "0.0000001", "1e-1000033", "1000001", "x"]
+)
 def test_invalid_estimate_units(value):
     with pytest.raises(ValueError):
         units(value)
