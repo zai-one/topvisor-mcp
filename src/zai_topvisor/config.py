@@ -34,6 +34,9 @@ class ServiceConfig:
     rate_limit: int = 20
     principal_rate_limit: int = 20
     max_concurrency: int = 2
+    check_projects: frozenset[int] = frozenset()
+    check_max_cost: str = "0"
+    check_daily_budget: str = "0"
 
     def __post_init__(self) -> None:
         if not self.user_id.isdecimal() or not 1 <= int(self.user_id) <= 2_147_483_647:
@@ -51,6 +54,15 @@ class ServiceConfig:
             raise ValueError("invalid request limits")
         if not 1 <= self.max_concurrency <= 20:
             raise ValueError("invalid concurrency limit")
+        from zai_topvisor.rank_checks import units
+
+        if len(self.check_projects) > 100 or any(
+            type(v) is not int or not 1 <= v <= 2147483647 for v in self.check_projects
+        ):
+            raise ValueError("invalid paid-check project allowlist")
+        maximum, daily = units(self.check_max_cost), units(self.check_daily_budget)
+        if maximum > daily:
+            raise ValueError("check maximum cannot exceed daily estimate budget")
 
     @classmethod
     def from_env(cls) -> ServiceConfig:
@@ -71,4 +83,9 @@ class ServiceConfig:
             rate_limit=int(os.environ.get("TOPVISOR_RATE_LIMIT", "20")),
             principal_rate_limit=int(os.environ.get("TOPVISOR_PRINCIPAL_RATE_LIMIT", "20")),
             max_concurrency=int(os.environ.get("TOPVISOR_MAX_CONCURRENCY", "2")),
+            check_projects=frozenset(
+                int(v) for v in os.environ.get("TOPVISOR_CHECK_PROJECTS", "").split(",") if v
+            ),
+            check_max_cost=os.environ.get("TOPVISOR_CHECK_MAX_COST", "0"),
+            check_daily_budget=os.environ.get("TOPVISOR_CHECK_DAILY_BUDGET", "0"),
         )

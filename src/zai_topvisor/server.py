@@ -19,11 +19,14 @@ from fastmcp.server.dependencies import get_access_token
 
 from zai_topvisor import __version__
 from zai_topvisor.adapter import TopvisorAdapter
+from zai_topvisor.check_store import CheckStore
 from zai_topvisor.coalescing import AsyncSingleFlight
 from zai_topvisor.config import ServiceConfig
 from zai_topvisor.errors import SafeToolError, safe_provider_error
 from zai_topvisor.onboarding import check_config, load_config
 from zai_topvisor.policy import PolicyStore
+from zai_topvisor.rank_checks import register_checks
+from zai_topvisor.rank_reports import register_report
 from zai_topvisor.sanitizer import sanitize_provider_response
 from zai_topvisor.tools import register_tools
 from zai_topvisor.transport import (
@@ -75,6 +78,7 @@ class Runtime:
             config.max_concurrency,
         )
         self.state: ContextVar[CallState] = ContextVar("topvisor_call")
+        self.checks = CheckStore(self.store)
         self.topvisor_write_enabled = config.write_enabled
 
     def require_scopes(self, *scopes: str) -> Callable[[Any], bool]:
@@ -264,6 +268,8 @@ def create_server(
     server = FastMCP("Topvisor MCP", version=__version__, auth=auth, mask_error_details=True)
     runtime = Runtime(config, transport, http_factory)
     register_tools(ToolRegistrar(server, runtime), runtime)
+    register_report(ToolRegistrar(server, runtime), runtime)
+    register_checks(ToolRegistrar(server, runtime), runtime)
     return server
 
 

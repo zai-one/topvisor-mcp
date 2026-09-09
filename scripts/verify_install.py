@@ -23,6 +23,13 @@ def local_only(sock, address):
     return original(sock, address)
 socket.socket.connect = local_only
 package, config = sys.argv[1:]
+from zai_topvisor.server import AdmittedHttpClient
+async def fixture_request(self, method, url, **kwargs):
+    await self._admit_attempt(1)
+    assert method == 'POST' and url.endswith('/get/positions_2/history')
+    return {'result': {'keywords': [{'id': 1, 'name': 'Fixture', 'positionsData': {
+        '2026-09-01:7:0': {'position': 10}, '2026-09-02:7:0': {'position': 3}}}]}}
+AdmittedHttpClient.request = fixture_request
 sys.argv = [package, '--config', config]
 runpy.run_module(package, run_name='__main__')
 """
@@ -58,6 +65,11 @@ async def check():
         tools = await client.list_tools()
         assert len(tools) >= int(minimum)
         assert all(tool.name for tool in tools)
+        result = (await client.call_tool('topvisor_rank_changes', {
+            'project_id': 7, 'region_index': 0, 'before_date': '2026-09-01', 'after_date': '2026-09-02'
+        })).data
+        assert result['rows'][0]['delta'] == 7
+        assert result['source']['provider_completeness'] == 'not_asserted'
         print(json.dumps({'version': expected_version, 'tools': sorted(tool.name for tool in tools)}))
 asyncio.run(check())
 """
@@ -167,7 +179,7 @@ def main():
         assert entry['args'] == ['-m', PACKAGE, '--config', str(config.resolve())]
         minimum = {
             "Keysso": 1,
-            "Topvisor": 18,
+            "Topvisor": 22,
             "Roistat": 22,
             "Yandex": 47,
             "Arsenkin": 12,

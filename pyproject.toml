@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "zai-topvisor-mcp"
-version = "0.2.0"
-description = "Standalone governed Topvisor MCP service"
+version = "0.3.0"
+description = "Compare saved SEO rankings, organise keywords and control paid Topvisor checks from your assistant"
 readme = "README.md"
 license = "LicenseRef-ZAI-ONE"
 license-files = ["LICENSE", "NOTICE"]
@@ -19,6 +19,7 @@ dependencies = [
 dev = ["pytest==9.1.1", "pytest-asyncio==1.4.0", "ruff==0.15.21"]
 
 [project.scripts]
+topvisor-check-reconcile = "zai_topvisor.rank_checks:reconcile_main"
 topvisor-mcp-setup = "zai_topvisor.setup:main"
 topvisor-mcp = "zai_topvisor.server:main"
 

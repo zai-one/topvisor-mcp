@@ -26,7 +26,9 @@ The example variable file is `.env.example`; the CLI does not load it implicitly
 ## Writes, limits and state
 
 Typed writes default to dry-run. Actual writes also need
-`TOPVISOR_WRITE_ENABLED=true`. Delete and paid checker execution remain excluded.
+`TOPVISOR_WRITE_ENABLED=true`. Delete remains excluded from the original adapter.
+Paid checks have a separate [quote/confirmation interface](RANKINGS.md), disabled
+until an operator project allowlist and nonzero estimate budgets are set.
 Each allowed write is validated, reserved in a persistent idempotency ledger,
 executed without blind retries, and followed by the original bounded readback.
 An omitted idempotency key derives from the operation and canonical JSON request hash.
@@ -57,6 +59,11 @@ runtime providing `topvisor()`, `require_scopes`, `read`, `write`, `safe_error`
 and `topvisor_write_enabled`. This lets the gateway keep its own authentication,
 audit, quotas and write ledger while using the very same adapter and tool code.
 The standalone SQLite runtime is not invoked in this embedding mode.
+
+The new saved-ranking report is registered through `rank_reports.register_report`.
+Paid-check tools in `rank_checks.register_checks` additionally require the account's
+durable `CheckStore` and operator cost configuration. They are registered by the
+standalone server; embedding the original tools does not silently enable them.
 
 Install an exact wheel/version and verify its SHA-256 before installation.
 The platform integration contains only compatibility types and policy binding;

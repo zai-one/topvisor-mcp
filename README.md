@@ -19,6 +19,10 @@ Try asking your assistant:
 | Review a project | Projects, folders, keyword groups, keywords and search settings. |
 | Organise keywords | Create groups, import phrases, assign target URLs and tags; preview supported writes first. |
 | Track changes | Read saved position history for the search regions configured in the project. |
+| Explain ranking changes | Compare two dates by keyword and relevant URL, then export JSON or CSV with missing values kept distinct from ranks. |
+| Run a controlled check | Get a price quote, confirm its cost and launch once within operator-defined projects and estimate limits. |
+
+[Ranking reports and paid-check walkthrough](docs/RANKINGS.md) includes requests, local configuration and recovery from an uncertain launch.
 
 ## Quick start
 
@@ -73,7 +77,7 @@ If tools do not appear, check the absolute path, whether the client can find `uv
 
 ## Access and limits
 
-Saved ranking history must already exist in Topvisor. This server does not launch paid position checks or delete data. Typed writes default to a preview and need explicit enabling for actual changes; history uses project region indexes.
+Ranking reports read history already saved in Topvisor. Paid checks use a separate quote and confirmation workflow, disabled until the operator sets project and estimate limits. Keyword changes default to a preview. Deletion is unavailable; history uses project region indexes. [Limits and reconciliation](docs/RANKINGS.md).
 
 Authenticated HTTP is available for a server deployment. See [HTTP setup](INSTALL.md#http), [configuration and permissions](docs/RUNTIME.md) and [Python package integration](INSTALL.md#python-package-and-platform-integration).
 

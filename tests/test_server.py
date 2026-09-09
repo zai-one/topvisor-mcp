@@ -24,6 +24,9 @@ SECRET = "synthetic-topvisor-key-never-live"
 CONTRACT = json.loads((Path(__file__).resolve().parents[1] / "contracts/topvisor.json").read_text())["tools"]
 WRITE = {"project_id": 1, "keyword_id": 2, "tags": [3], "apply": True, "idempotency_key": "change-1"}
 READ_TOOLS = {
+    "topvisor_rank_changes",
+    "topvisor_check_quote",
+    "topvisor_check_status",
     "topvisor_positions_history",
     "topvisor_list_projects",
     "topvisor_list_keywords",
@@ -33,6 +36,7 @@ READ_TOOLS = {
     "topvisor_search_regions",
 }
 WRITE_TOOLS = {
+    "topvisor_check_launch",
     "topvisor_create_project",
     "topvisor_create_folder",
     "topvisor_create_groups",
@@ -121,7 +125,13 @@ async def test_original_surface_runs_and_counts_every_write_and_readback(tmp_pat
         assert names == READ_TOOLS | WRITE_TOOLS
         for tool in await client.list_tools():
             if tool.name not in CONTRACT:
-                assert tool.name == "topvisor_positions_history"
+                assert tool.name in {
+                    "topvisor_positions_history",
+                    "topvisor_rank_changes",
+                    "topvisor_check_quote",
+                    "topvisor_check_launch",
+                    "topvisor_check_status",
+                }
                 continue
             assert {
                 "inputSchema": tool.inputSchema,
