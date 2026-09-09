@@ -19,6 +19,7 @@ dependencies = [
 dev = ["pytest==9.1.1", "pytest-asyncio==1.4.0", "ruff==0.15.21"]
 
 [project.scripts]
+topvisor-mcp-setup = "zai_topvisor.setup:main"
 topvisor-mcp = "zai_topvisor.server:main"
 
 [tool.hatch.build.targets.wheel]
