@@ -10,6 +10,7 @@ from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import wraps
+from pathlib import Path
 from typing import Any, TypeVar
 from uuid import uuid4
 
@@ -37,6 +38,7 @@ from zai_topvisor.transport import (
     ProviderTimeoutError,
     request_hash,
 )
+from zai_topvisor.update_check import CACHE_FILE, cached_hint, check_update, refresh_in_background
 
 T = TypeVar("T")
 OPERATION_TIMEOUT_SECONDS = 75.0
@@ -265,12 +267,41 @@ def create_server(
         if transport == "http"
         else None
     )
-    server = FastMCP("Topvisor MCP", version=__version__, auth=auth, mask_error_details=True)
+    update_cache = update_cache_path(config)
+    server = FastMCP(
+        "Topvisor MCP",
+        version=__version__,
+        auth=auth,
+        mask_error_details=True,
+        instructions=cached_hint(update_cache),
+    )
     runtime = Runtime(config, transport, http_factory)
     register_tools(ToolRegistrar(server, runtime), runtime)
     register_report(ToolRegistrar(server, runtime), runtime)
     register_checks(ToolRegistrar(server, runtime), runtime)
+
+    @server.tool(
+        auth=runtime.require_scopes("topvisor:read"),
+        annotations={
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True,
+        },
+    )
+    async def topvisor_check_update(force_refresh: bool = False) -> dict[str, Any]:
+        """Compare the installed version with the latest GitHub release and suggest an update command.
+
+        Read-only; never installs anything. Uses a 24h cache.
+        Set TOPVISOR_DISABLE_UPDATE_CHECK=1 to opt out.
+        """
+        return await asyncio.to_thread(check_update, update_cache, force=force_refresh)
+
     return server
+
+
+def update_cache_path(config: ServiceConfig) -> Path:
+    return config.state_path.parent / CACHE_FILE
 
 
 def main() -> None:
@@ -291,6 +322,8 @@ def main() -> None:
             print(json.dumps(result, sort_keys=True))
             parser.exit(0 if result["ready"] else 2)
         server = create_server(config, transport=args.transport)
+        # Non-blocking: refresh a stale update cache for the next start; failures are silent.
+        refresh_in_background(update_cache_path(config))
     except (ValueError, OSError) as exc:
         parser.exit(2, f"configuration error: {type(exc).__name__}; check credential and policy files\n")
     if args.transport == "http":
