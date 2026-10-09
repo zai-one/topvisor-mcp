@@ -28,6 +28,9 @@ READ_TOOLS = {
     "topvisor_check_quote",
     "topvisor_check_status",
     "topvisor_positions_history",
+    "topvisor_ai_tracker_settings",
+    "topvisor_ai_tracker_summary",
+    "topvisor_ai_tracker_history",
     "topvisor_list_projects",
     "topvisor_list_keywords",
     "topvisor_get_project_setup",
@@ -127,6 +130,9 @@ async def test_original_surface_runs_and_counts_every_write_and_readback(tmp_pat
             if tool.name not in CONTRACT:
                 assert tool.name in {
                     "topvisor_positions_history",
+                    "topvisor_ai_tracker_settings",
+                    "topvisor_ai_tracker_summary",
+                    "topvisor_ai_tracker_history",
                     "topvisor_rank_changes",
                     "topvisor_check_quote",
                     "topvisor_check_launch",

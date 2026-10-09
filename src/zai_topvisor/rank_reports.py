@@ -156,7 +156,10 @@ async def report(runtime, project_id, region_index, before_date, after_date, lim
 
 
 def register_report(server, runtime):
-    @server.tool(auth=runtime.require_scopes("topvisor:read"))
+    @server.tool(
+        auth=runtime.require_scopes("topvisor:read"),
+        annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True},
+    )
     async def topvisor_rank_changes(
         project_id: int,
         region_index: int,

@@ -109,7 +109,10 @@ def quote_view(record):
 
 
 def register_checks(server, runtime):
-    @server.tool(auth=runtime.require_scopes("topvisor:read"))
+    @server.tool(
+        auth=runtime.require_scopes("topvisor:read"),
+        annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": False},
+    )
     async def topvisor_check_quote(project_id: int, region_indexes: list[int]) -> dict:
         """Get a five-minute price quote for one owned project and explicit regions; no paid dispatch."""
         payload = selection(project_id, region_indexes)
@@ -117,7 +120,16 @@ def register_checks(server, runtime):
         record = runtime.checks.create(runtime.state.get().actor, project_id, payload, cost)
         return quote_view(record)
 
-    @server.tool(auth=runtime.require_scopes("topvisor:read", "topvisor:write"))
+    @server.tool(
+        auth=runtime.require_scopes("topvisor:read", "topvisor:write"),
+        # Spends provider balance; replays of an accepted quote return the stored receipt.
+        annotations={
+            "readOnlyHint": False,
+            "destructiveHint": True,
+            "idempotentHint": True,
+            "openWorldHint": True,
+        },
+    )
     async def topvisor_check_launch(check_id: str, approved_cost: str, confirm_cost: bool = False) -> dict:
         """Launch an approved quote once, under operator project/estimate budgets. Outcome may be unknown."""
         config, actor = runtime.config, runtime.state.get().actor
@@ -160,7 +172,10 @@ def register_checks(server, runtime):
         runtime.checks.accepted(actor, check_id, answer)
         return answer
 
-    @server.tool(auth=runtime.require_scopes("topvisor:read"))
+    @server.tool(
+        auth=runtime.require_scopes("topvisor:read"),
+        annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True},
+    )
     async def topvisor_check_status(check_id: str) -> dict:
         """Read your local check receipt and aggregate project status; does not infer job completion."""
         record = runtime.checks.get(runtime.state.get().actor, check_id)

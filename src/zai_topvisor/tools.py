@@ -20,6 +20,17 @@ from zai_topvisor.adapter import (
 )
 from zai_topvisor.transport import ProviderError
 
+# MCP tool annotations (hints for clients; enforcement stays server-side).
+READ_ONLY = {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True}
+DRY_RUN_WRITE = {
+    "readOnlyHint": False,
+    "destructiveHint": False,
+    "idempotentHint": True,
+    "openWorldHint": True,
+}
+# Overwrites or removes existing values (target URL, tags, legacy rename/toggle) when applied.
+DRY_RUN_OVERWRITE = {**DRY_RUN_WRITE, "destructiveHint": True}
+
 
 def register_tools(server: Any, runtime: Any) -> None:
     registry = runtime
@@ -29,15 +40,26 @@ def register_tools(server: Any, runtime: Any) -> None:
     _provider_read = runtime.read
     _autonomous_write = runtime.write
 
-    @server.tool(auth=require_scopes("topvisor:read"))
+    @server.tool(auth=require_scopes("topvisor:read"), annotations=READ_ONLY)
     async def topvisor_positions_history(
-        project_id: int, region_indexes: list[int], dates: list[str], limit: int = 100, offset: int = 0
+        project_id: int,
+        region_indexes: list[int],
+        dates: list[str],
+        limit: int = 100,
+        offset: int = 0,
+        serp_features: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Read saved positions by date and project region index; never starts checks."""
+        """Read saved positions by date and project region index; never starts checks.
+
+        serp_features optionally keeps only keywords whose SERP has these features:
+        aiOverviewExists, images, video, knowledge, maps.
+        """
         adapter = registry.topvisor()
         arguments = dict(
             project_id=project_id, region_indexes=region_indexes, dates=dates, limit=limit, offset=offset
         )
+        if serp_features:
+            arguments["serp_features"] = serp_features
         return {
             "payload": await _provider_read(
                 "topvisor",
@@ -48,7 +70,83 @@ def register_tools(server: Any, runtime: Any) -> None:
             )
         }
 
-    @server.tool(auth=require_scopes("topvisor:read"))
+    @server.tool(auth=require_scopes("topvisor:read"), annotations=READ_ONLY)
+    async def topvisor_ai_tracker_settings(
+        project_id: int, show_available_models: bool = False
+    ) -> dict[str, Any]:
+        """Read a project's AI tracker settings and enabled model keys; never starts checks."""
+        adapter = registry.topvisor()
+        arguments = {"project_id": project_id, "show_available_models": show_available_models}
+        return {
+            "payload": await _provider_read(
+                "topvisor",
+                "ai_tracker_settings",
+                arguments,
+                lambda: adapter.ai_tracker_settings(project_id, show_available_models),
+                validate=lambda: TopvisorAdapter.validate_ai_settings(project_id, show_available_models),
+            )
+        }
+
+    @server.tool(auth=require_scopes("topvisor:read"), annotations=READ_ONLY)
+    async def topvisor_ai_tracker_summary(
+        project_id: int, model_key: str, dates: list[str], competitor_id: int | None = None
+    ) -> dict[str, Any]:
+        """Read saved AI tracker mentions, visibility and sentiment summary for one model and dates."""
+        adapter = registry.topvisor()
+        arguments = {
+            "project_id": project_id,
+            "model_key": model_key,
+            "dates": dates,
+            "competitor_id": competitor_id,
+        }
+        return {
+            "payload": await _provider_read(
+                "topvisor",
+                "ai_tracker_summary",
+                arguments,
+                lambda: adapter.ai_tracker_summary(project_id, model_key, dates, competitor_id),
+                validate=lambda: TopvisorAdapter.validate_ai_summary(
+                    project_id, model_key, dates, competitor_id
+                ),
+            )
+        }
+
+    @server.tool(auth=require_scopes("topvisor:read"), annotations=READ_ONLY)
+    async def topvisor_ai_tracker_history(
+        project_id: int,
+        models_keys: list[str],
+        dates: list[str],
+        history_fields: list[str] | None = None,
+        sentiments: list[str] | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        """Read saved AI tracker results per prompt; never starts paid checks.
+
+        history_fields defaults to mentioned, position, sentiment; response/response_marked/metadata
+        return large AI answer texts. sentiments filters by good, neutral or bad.
+        """
+        adapter = registry.topvisor()
+        arguments = {
+            "project_id": project_id,
+            "models_keys": models_keys,
+            "dates": dates,
+            "history_fields": history_fields,
+            "sentiments": sentiments,
+            "limit": limit,
+            "offset": offset,
+        }
+        return {
+            "payload": await _provider_read(
+                "topvisor",
+                "ai_tracker_history",
+                arguments,
+                lambda: adapter.ai_tracker_history(**arguments),
+                validate=lambda: TopvisorAdapter.validate_ai_history(**arguments),
+            )
+        }
+
+    @server.tool(auth=require_scopes("topvisor:read"), annotations=READ_ONLY)
     async def topvisor_list_projects(
         limit: int = 100, offset: int = 0, include_positions_summary: bool = False
     ) -> dict[str, Any]:
@@ -72,7 +170,7 @@ def register_tools(server: Any, runtime: Any) -> None:
             )
         }
 
-    @server.tool(auth=require_scopes("topvisor:read"))
+    @server.tool(auth=require_scopes("topvisor:read"), annotations=READ_ONLY)
     async def topvisor_list_keywords(
         project_id: int, limit: int = 100, offset: int = 0, show_trash: bool = False
     ) -> dict[str, Any]:
@@ -98,7 +196,7 @@ def register_tools(server: Any, runtime: Any) -> None:
             )
         }
 
-    @server.tool(auth=require_scopes("topvisor:read"))
+    @server.tool(auth=require_scopes("topvisor:read"), annotations=READ_ONLY)
     async def topvisor_get_project_setup(project_id: int) -> dict[str, Any]:
         """Read one Topvisor project with its configured searchers and regions."""
         adapter = registry.topvisor()
@@ -112,7 +210,7 @@ def register_tools(server: Any, runtime: Any) -> None:
             )
         }
 
-    @server.tool(auth=require_scopes("topvisor:read"))
+    @server.tool(auth=require_scopes("topvisor:read"), annotations=READ_ONLY)
     async def topvisor_list_folders(
         project_id: int,
         limit: int = 100,
@@ -146,7 +244,7 @@ def register_tools(server: Any, runtime: Any) -> None:
             )
         }
 
-    @server.tool(auth=require_scopes("topvisor:read"))
+    @server.tool(auth=require_scopes("topvisor:read"), annotations=READ_ONLY)
     async def topvisor_list_groups(
         project_id: int,
         limit: int = 100,
@@ -170,7 +268,7 @@ def register_tools(server: Any, runtime: Any) -> None:
             )
         }
 
-    @server.tool(auth=require_scopes("topvisor:read"))
+    @server.tool(auth=require_scopes("topvisor:read"), annotations=READ_ONLY)
     async def topvisor_search_regions(
         searcher_key: int | str,
         search: str,
@@ -323,7 +421,7 @@ def register_tools(server: Any, runtime: Any) -> None:
             ),
         )
 
-    @server.tool(auth=require_scopes("topvisor:write"))
+    @server.tool(auth=require_scopes("topvisor:write"), annotations=DRY_RUN_WRITE)
     async def topvisor_create_project(
         site: str,
         name: str | None = None,
@@ -402,7 +500,7 @@ def register_tools(server: Any, runtime: Any) -> None:
             "write_receipt": receipt,
         }
 
-    @server.tool(auth=require_scopes("topvisor:write"))
+    @server.tool(auth=require_scopes("topvisor:write"), annotations=DRY_RUN_WRITE)
     async def topvisor_create_folder(
         project_id: int,
         name: str,
@@ -469,7 +567,7 @@ def register_tools(server: Any, runtime: Any) -> None:
             "write_receipt": receipt,
         }
 
-    @server.tool(auth=require_scopes("topvisor:write"))
+    @server.tool(auth=require_scopes("topvisor:write"), annotations=DRY_RUN_WRITE)
     async def topvisor_create_groups(
         project_id: int,
         names: list[str],
@@ -641,7 +739,7 @@ def register_tools(server: Any, runtime: Any) -> None:
             "write_receipt": receipt,
         }
 
-    @server.tool(auth=require_scopes("topvisor:write"))
+    @server.tool(auth=require_scopes("topvisor:write"), annotations=DRY_RUN_WRITE)
     async def topvisor_import_keywords(
         project_id: int,
         keywords: list[dict[str, Any]],
@@ -653,7 +751,7 @@ def register_tools(server: Any, runtime: Any) -> None:
             "topvisor_import_keywords", project_id, keywords, apply, idempotency_key
         )
 
-    @server.tool(auth=require_scopes("topvisor:write"))
+    @server.tool(auth=require_scopes("topvisor:write"), annotations=DRY_RUN_WRITE)
     async def topvisor_add_keywords(
         project_id: int,
         folder_path: str,
@@ -675,7 +773,7 @@ def register_tools(server: Any, runtime: Any) -> None:
             "topvisor_add_keywords", project_id, scoped, apply, idempotency_key
         )
 
-    @server.tool(auth=require_scopes("topvisor:write"))
+    @server.tool(auth=require_scopes("topvisor:write"), annotations=DRY_RUN_OVERWRITE)
     async def topvisor_set_keyword_target(
         project_id: int,
         keyword_id: int,
@@ -692,7 +790,7 @@ def register_tools(server: Any, runtime: Any) -> None:
             idempotency_key,
         )
 
-    @server.tool(auth=require_scopes("topvisor:write"))
+    @server.tool(auth=require_scopes("topvisor:write"), annotations=DRY_RUN_OVERWRITE)
     async def topvisor_set_keyword_tags(
         project_id: int,
         keyword_id: int,
@@ -710,7 +808,7 @@ def register_tools(server: Any, runtime: Any) -> None:
             idempotency_key,
         )
 
-    @server.tool(auth=require_scopes("topvisor:write"))
+    @server.tool(auth=require_scopes("topvisor:write"), annotations=DRY_RUN_WRITE)
     async def topvisor_add_searcher(
         project_id: int,
         searcher_key: int | str,
@@ -726,7 +824,7 @@ def register_tools(server: Any, runtime: Any) -> None:
             idempotency_key,
         )
 
-    @server.tool(auth=require_scopes("topvisor:write"))
+    @server.tool(auth=require_scopes("topvisor:write"), annotations=DRY_RUN_WRITE)
     async def topvisor_add_region(
         project_id: int,
         searcher_key: int | str,
@@ -756,7 +854,7 @@ def register_tools(server: Any, runtime: Any) -> None:
             idempotency_key,
         )
 
-    @server.tool(auth=require_scopes("topvisor:write"))
+    @server.tool(auth=require_scopes("topvisor:write"), annotations=DRY_RUN_WRITE)
     async def topvisor_import_regions(
         project_id: int,
         regions: list[dict[str, Any]],
@@ -774,7 +872,7 @@ def register_tools(server: Any, runtime: Any) -> None:
         )
         return {**receipt, "region_count": len(normalized), "preview": normalized[:10]}
 
-    @server.tool(auth=require_scopes("topvisor:write"))
+    @server.tool(auth=require_scopes("topvisor:write"), annotations=DRY_RUN_OVERWRITE)
     async def topvisor_apply(
         operation: list[str],
         params: dict[str, Any],
