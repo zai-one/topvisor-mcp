@@ -18,7 +18,8 @@ Try asking your assistant:
 |---|---|
 | Review a project | Projects, folders, keyword groups, keywords and search settings. |
 | Organise keywords | Create groups, import phrases, assign target URLs and tags; preview supported writes first. |
-| Track changes | Read saved position history for the search regions configured in the project. |
+| Track changes | Read saved position history for the search regions configured in the project, optionally only keywords with SERP features such as AI Overview (`serp_features`). |
+| Track AI answers | Read AI tracker settings, mention/visibility/sentiment summary and per-prompt history (`topvisor_ai_tracker_*`); paid AI checks are not started. |
 | Explain ranking changes | Compare two dates by keyword and relevant URL, then export JSON or CSV with missing values kept distinct from ranks. |
 | Run a controlled check | Get a price quote, confirm its cost and launch once within operator-defined projects and estimate limits. |
 
@@ -78,6 +79,10 @@ If tools do not appear, check the absolute path, whether the client can find `uv
 ## Access and limits
 
 Ranking reports read history already saved in Topvisor. Paid checks use a separate quote and confirmation workflow, disabled until the operator sets project and estimate limits. Keyword changes default to a preview. Deletion is unavailable; history uses project region indexes. [Limits and reconciliation](docs/RANKINGS.md).
+
+### Updates
+
+`topvisor_check_update` compares the installed version with the latest [GitHub release](https://github.com/zai-one/topvisor-mcp/releases) and returns the release link and the matching `uv tool install --force ...` command. It never installs anything. The result is cached for 24 hours next to the state database; when a newer release is cached, the server instructions mention it once. Set `TOPVISOR_DISABLE_UPDATE_CHECK=1` to turn off both the tool's network request and the startup refresh.
 
 Authenticated HTTP is available for a server deployment. See [HTTP setup](INSTALL.md#http), [configuration and permissions](docs/RUNTIME.md) and [Python package integration](INSTALL.md#python-package-and-platform-integration).
 

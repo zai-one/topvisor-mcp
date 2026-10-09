@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `topvisor_positions_history` accepts `serp_features` (`filter_by_serp_features`: `aiOverviewExists`, `images`, `video`, `knowledge`, `maps`), added to the Topvisor OpenAPI on 2026-10-08.
+- Read-only AI tracker tools over `aiTracker_2`: `topvisor_ai_tracker_settings`, `topvisor_ai_tracker_summary`, `topvisor_ai_tracker_history`. Paid `checker/go` and `del/history` stay unavailable.
+- `topvisor_check_update`: suggests an update from the latest GitHub release (24h cache, offline-safe, never installs); cached startup hint; opt out with `TOPVISOR_DISABLE_UPDATE_CHECK=1`.
+- MCP tool annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`) on every tool.
+
 ## 0.3.0
 
 - Installable setup wizard and JSON/TOML client snippets that work outside the checkout.

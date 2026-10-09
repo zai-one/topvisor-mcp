@@ -65,4 +65,4 @@ For a source checkout, prefix it with `uv run --frozen`. Use `not_dispatched` on
 
 ## Provider references
 
-[Saved history](https://topvisor.com/ru/api/positions-2/get-history/), [price estimate](https://topvisor.com/ru/api/positions-2/get-checker-price/), [launch acknowledgement](https://topvisor.com/ru/api/positions-2/edit-checker-go/). No live account was used to develop the fixtures.
+[Saved history](https://topvisor.com/ru/api/positions-2/get-history/), [price estimate](https://topvisor.com/ru/api/positions-2/get-checker-price/), [launch acknowledgement](https://topvisor.com/ru/api/positions-2/edit-checker-go/), [SERP feature filter](https://github.com/topvisor/topvisor-openapi/blob/main/src/json/Positions_2/Types/History/SerpFeature.json), [AI tracker](https://topvisor.com/ru/api/aitracker-2/) ([settings](https://topvisor.com/ru/api/aitracker-2/get-settings/), [summary](https://topvisor.com/ru/api/aitracker-2/get-summary/), [history](https://topvisor.com/ru/api/aitracker-2/get-history/)). No live account was used to develop the fixtures.
