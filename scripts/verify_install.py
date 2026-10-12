@@ -91,6 +91,8 @@ def private(path, value):
 
 
 def main():
+    # Never let the installed server (or anything it starts) contact GitHub for updates.
+    os.environ[NAME.upper() + "_DISABLE_UPDATE_CHECK"] = "1"
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
     extra = ["--extra", "standalone"] if "standalone" in project.get("optional-dependencies", {}) else []
     with tempfile.TemporaryDirectory(prefix="mcp-install-gate-") as directory:

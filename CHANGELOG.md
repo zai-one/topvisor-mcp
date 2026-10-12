@@ -6,6 +6,7 @@
 - Read-only AI tracker tools over `aiTracker_2`: `topvisor_ai_tracker_settings`, `topvisor_ai_tracker_summary`, `topvisor_ai_tracker_history`. Paid `checker/go` and `del/history` stay unavailable.
 - `topvisor_check_update`: suggests an update from the latest GitHub release (24h cache, offline-safe, never installs); cached startup hint; opt out with `TOPVISOR_DISABLE_UPDATE_CHECK=1`.
 - MCP tool annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`) on every tool.
+- Update check hardening: only plain numeric release tags are accepted (from GitHub and from the cache); every attempt is recorded, a failed attempt pauses checks for 30 minutes and `force_refresh` is honoured at most once a minute, also at startup; `topvisor_check_update` now runs through the standard runtime (actor check, audit record, deadline) without spending Topvisor quota; `TOPVISOR_DISABLE_UPDATE_CHECK` is documented in `.env.example`, `INSTALL.md` and `docs/RUNTIME.md`.
 
 ## 0.3.0
 
