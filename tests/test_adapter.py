@@ -113,6 +113,8 @@ async def test_operation_allowlist_rejects_writes_paid_checks_and_path_escape_be
         ("add", "projects_2", "projects"),
         ("get", "bank_2", "info"),
         ("get", "projects_2/../bank_2", "info"),
+        ("edit", "aiTracker_2", "checker/go"),
+        ("del", "aiTracker_2", "history"),
     )
     for action, service, method in attempts:
         with pytest.raises(ValueError, match="invalid path segment|operation is not allowed"):
@@ -125,6 +127,9 @@ async def test_operation_allowlist_rejects_writes_paid_checks_and_path_escape_be
         GROUPS_OPERATION,
         REGIONS_OPERATION,
         ("get", "positions_2", "history"),
+        ("get", "aiTracker_2", "settings"),
+        ("get", "aiTracker_2", "summary"),
+        ("get", "aiTracker_2", "history"),
     } == ALLOWED_OPERATIONS
     assert http.calls == []
 

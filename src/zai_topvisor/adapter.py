@@ -108,6 +108,12 @@ FOLDERS_OPERATION = ("get", "keywords_2", "folders")
 GROUPS_OPERATION = ("get", "keywords_2", "groups")
 REGIONS_OPERATION = ("get", "system_2", "common", "regions")
 HISTORY_OPERATION = ("get", "positions_2", "history")
+# AI tracker (aiTracker_2), read-only methods only; paid checker/go and del/history stay absent.
+# https://topvisor.com/ru/api/aitracker-2/
+AI_SETTINGS_OPERATION = ("get", "aiTracker_2", "settings")
+AI_SUMMARY_OPERATION = ("get", "aiTracker_2", "summary")
+AI_HISTORY_OPERATION = ("get", "aiTracker_2", "history")
+AI_OPERATIONS = frozenset({AI_SETTINGS_OPERATION, AI_SUMMARY_OPERATION, AI_HISTORY_OPERATION})
 ALLOWED_OPERATIONS = frozenset(
     {
         PROJECTS_OPERATION,
@@ -116,8 +122,18 @@ ALLOWED_OPERATIONS = frozenset(
         GROUPS_OPERATION,
         REGIONS_OPERATION,
         HISTORY_OPERATION,
+        *AI_OPERATIONS,
     }
 )
+# Positions_2.Types.History.SerpFeature (topvisor-openapi, 2026-10-08).
+SERP_FEATURES = frozenset({"aiOverviewExists", "images", "video", "knowledge", "maps"})
+# AiTracker_2.Types.History.HistoryField / FilterBySentiment (topvisor-openapi).
+AI_HISTORY_FIELDS = frozenset(
+    {"response", "response_marked", "metadata", "mentioned", "position", "position_max", "sentiment"}
+)
+DEFAULT_AI_HISTORY_FIELDS = ("mentioned", "position", "sentiment")
+AI_SENTIMENTS = frozenset({"bad", "neutral", "good"})
+MAX_AI_MODELS = 10
 
 # Guarded WRITE surface for project provisioning and semantic inventory. Every
 # endpoint is an explicit reviewed allowlist entry. Destructive del/* methods and
@@ -254,6 +270,9 @@ def _reject_folder_group_trash(show_trash: bool) -> None:
 
 
 _PATH_SEGMENT = re.compile(r"[a-z][a-z0-9_]{0,31}\Z")
+# Read services may be camelCase (aiTracker_2); reads stay limited to ALLOWED_OPERATIONS.
+_READ_PATH_SEGMENT = re.compile(r"[a-z][A-Za-z0-9_]{0,31}\Z")
+_MODEL_KEY = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}\Z")
 _SAFE_ERROR_CODE = re.compile(r"[A-Za-z0-9_.-]{1,64}\Z")
 
 # Topvisor's public API uses numeric identifiers here.  Keep a small alias
@@ -366,6 +385,24 @@ def _fields(value: object, *, allowed: frozenset[str], field: str = "fields") ->
         if item not in normalized:
             normalized.append(item)
     return normalized
+
+
+def _enum_list(value: object, allowed: frozenset[str], field: str) -> list[str]:
+    if (
+        isinstance(value, (str, bytes))
+        or not isinstance(value, Sequence)
+        or not 1 <= len(value) <= len(allowed)
+    ):
+        raise ValueError(f"{field} must be a non-empty list")
+    if any(not isinstance(item, str) or item not in allowed for item in value):
+        raise ValueError(f"{field} accepts only: " + ", ".join(sorted(allowed)))
+    return list(dict.fromkeys(value))
+
+
+def _model_key(value: object) -> str:
+    if not isinstance(value, str) or _MODEL_KEY.fullmatch(value.strip()) is None:
+        raise ValueError("model_key must be a model key from topvisor_ai_tracker_settings")
+    return value.strip()
 
 
 def _string_value(value: object, field: str, maximum: int) -> str:
@@ -625,7 +662,7 @@ class TopvisorAdapter:
     @staticmethod
     def validate_operation(action: str, service: str, *method: str) -> tuple[str, ...]:
         operation = tuple(part.strip() for part in (action, service, *method))
-        if any(_PATH_SEGMENT.fullmatch(part) is None for part in operation):
+        if any(_READ_PATH_SEGMENT.fullmatch(part) is None for part in operation):
             raise ValueError("Topvisor operation contains an invalid path segment")
         if operation not in ALLOWED_OPERATIONS:
             raise ValueError("Topvisor operation is not allowed")
@@ -642,6 +679,7 @@ class TopvisorAdapter:
                 "offset",
                 "type_range",
                 "positions_fields",
+                "filter_by_serp_features",
             }:
                 raise ValueError("unsupported history parameter")
             if payload.get("type_range", 100) != 100 or payload.get(
@@ -652,6 +690,53 @@ class TopvisorAdapter:
                 payload.get("project_id"),
                 payload.get("regions_indexes"),
                 payload.get("dates"),
+                payload.get("limit", 100),
+                payload.get("offset", 0),
+                payload.get("filter_by_serp_features"),
+            )
+        if operation == AI_SETTINGS_OPERATION:
+            if set(payload) - {"project_id", "showAvailableModels"}:
+                raise ValueError("unsupported AI tracker settings parameter")
+            return TopvisorAdapter.validate_ai_settings(
+                payload.get("project_id"), payload.get("showAvailableModels", False)
+            )
+        if operation == AI_SUMMARY_OPERATION:
+            fixed = {
+                "type_range": 100,
+                "show_count_mentioned": True,
+                "show_visibility": True,
+                "show_sentiments": True,
+            }
+            if set(payload) - {"project_id", "model_key", "dates", "competitor_id", *fixed}:
+                raise ValueError("unsupported AI tracker summary parameter")
+            if any(payload.get(key, value) != value for key, value in fixed.items()):
+                raise ValueError("AI tracker summary uses explicit dates and fixed indicators")
+            return TopvisorAdapter.validate_ai_summary(
+                payload.get("project_id"),
+                payload.get("model_key"),
+                payload.get("dates"),
+                payload.get("competitor_id"),
+            )
+        if operation == AI_HISTORY_OPERATION:
+            if set(payload) - {
+                "project_id",
+                "models_keys",
+                "dates",
+                "type_range",
+                "history_fields",
+                "filter_by_sentiment",
+                "limit",
+                "offset",
+            }:
+                raise ValueError("unsupported AI tracker history parameter")
+            if payload.get("type_range", 100) != 100:
+                raise ValueError("AI tracker history uses explicit dates")
+            return TopvisorAdapter.validate_ai_history(
+                payload.get("project_id"),
+                payload.get("models_keys"),
+                payload.get("dates"),
+                payload.get("history_fields"),
+                payload.get("filter_by_sentiment"),
                 payload.get("limit", 100),
                 payload.get("offset", 0),
             )
@@ -794,30 +879,105 @@ class TopvisorAdapter:
         return await self._read((action, service, method), payload)
 
     @staticmethod
-    def validate_history(project_id, region_indexes, dates, limit=100, offset=0) -> dict[str, Any]:
-        if not isinstance(region_indexes, list) or not 1 <= len(region_indexes) <= 10:
-            raise ValueError("provide 1-10 project region indexes")
+    def validate_dates(dates: object) -> list[str]:
         if not isinstance(dates, list) or not 1 <= len(dates) <= 31:
             raise ValueError("provide 1-31 explicit check dates")
         for value in dates:
             if not isinstance(value, str) or re.fullmatch(r"\d{4}-\d{2}-\d{2}", value) is None:
                 raise ValueError("dates must use YYYY-MM-DD")
             date.fromisoformat(value)
-        return {
+        return list(dict.fromkeys(dates))
+
+    @staticmethod
+    def validate_history(
+        project_id, region_indexes, dates, limit=100, offset=0, serp_features=None
+    ) -> dict[str, Any]:
+        if not isinstance(region_indexes, list) or not 1 <= len(region_indexes) <= 10:
+            raise ValueError("provide 1-10 project region indexes")
+        validated = {
             "project_id": _positive_int(project_id, "project_id", MAX_ID),
             "regions_indexes": list(
                 dict.fromkeys(_non_negative_int(value, "region_index", MAX_ID) for value in region_indexes)
             ),
-            "dates": list(dict.fromkeys(dates)),
+            "dates": TopvisorAdapter.validate_dates(dates),
             "type_range": 100,
             "positions_fields": ["position", "relevant_url"],
             "limit": _positive_int(limit, "limit", MAX_LIMIT),
             "offset": _non_negative_int(offset, "offset", MAX_OFFSET),
         }
+        if serp_features:
+            validated["filter_by_serp_features"] = _enum_list(serp_features, SERP_FEATURES, "serp_features")
+        return validated
 
-    async def positions_history(self, project_id, region_indexes, dates, limit=100, offset=0):
+    async def positions_history(
+        self, project_id, region_indexes, dates, limit=100, offset=0, serp_features=None
+    ):
         return await self._read(
-            HISTORY_OPERATION, self.validate_history(project_id, region_indexes, dates, limit, offset)
+            HISTORY_OPERATION,
+            self.validate_history(project_id, region_indexes, dates, limit, offset, serp_features),
+        )
+
+    @staticmethod
+    def validate_ai_settings(project_id, show_available_models=False) -> dict[str, Any]:
+        return {
+            "project_id": _positive_int(project_id, "project_id", MAX_ID),
+            "showAvailableModels": _boolean(show_available_models, "show_available_models"),
+        }
+
+    @staticmethod
+    def validate_ai_summary(project_id, model_key, dates, competitor_id=None) -> dict[str, Any]:
+        validated: dict[str, Any] = {
+            "project_id": _positive_int(project_id, "project_id", MAX_ID),
+            "model_key": _model_key(model_key),
+            "dates": TopvisorAdapter.validate_dates(dates),
+            "type_range": 100,
+            "show_count_mentioned": True,
+            "show_visibility": True,
+            "show_sentiments": True,
+        }
+        if competitor_id is not None:
+            validated["competitor_id"] = _positive_int(competitor_id, "competitor_id", MAX_ID)
+        return validated
+
+    @staticmethod
+    def validate_ai_history(
+        project_id, models_keys, dates, history_fields=None, sentiments=None, limit=100, offset=0
+    ) -> dict[str, Any]:
+        if not isinstance(models_keys, list) or not 1 <= len(models_keys) <= MAX_AI_MODELS:
+            raise ValueError(f"provide 1-{MAX_AI_MODELS} AI model keys from topvisor_ai_tracker_settings")
+        validated: dict[str, Any] = {
+            "project_id": _positive_int(project_id, "project_id", MAX_ID),
+            "models_keys": list(dict.fromkeys(_model_key(value) for value in models_keys)),
+            "dates": TopvisorAdapter.validate_dates(dates),
+            "type_range": 100,
+            "history_fields": _enum_list(
+                history_fields or list(DEFAULT_AI_HISTORY_FIELDS), AI_HISTORY_FIELDS, "history_fields"
+            ),
+            "limit": _positive_int(limit, "limit", MAX_LIMIT),
+            "offset": _non_negative_int(offset, "offset", MAX_OFFSET),
+        }
+        if sentiments:
+            validated["filter_by_sentiment"] = _enum_list(sentiments, AI_SENTIMENTS, "sentiments")
+        return validated
+
+    async def ai_tracker_settings(self, project_id, show_available_models=False):
+        return await self._read(
+            AI_SETTINGS_OPERATION, self.validate_ai_settings(project_id, show_available_models)
+        )
+
+    async def ai_tracker_summary(self, project_id, model_key, dates, competitor_id=None):
+        return await self._read(
+            AI_SUMMARY_OPERATION, self.validate_ai_summary(project_id, model_key, dates, competitor_id)
+        )
+
+    async def ai_tracker_history(
+        self, project_id, models_keys, dates, history_fields=None, sentiments=None, limit=100, offset=0
+    ):
+        return await self._read(
+            AI_HISTORY_OPERATION,
+            self.validate_ai_history(
+                project_id, models_keys, dates, history_fields, sentiments, limit, offset
+            ),
         )
 
     async def projects(

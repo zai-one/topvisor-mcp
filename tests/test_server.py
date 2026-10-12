@@ -28,12 +28,16 @@ READ_TOOLS = {
     "topvisor_check_quote",
     "topvisor_check_status",
     "topvisor_positions_history",
+    "topvisor_ai_tracker_settings",
+    "topvisor_ai_tracker_summary",
+    "topvisor_ai_tracker_history",
     "topvisor_list_projects",
     "topvisor_list_keywords",
     "topvisor_get_project_setup",
     "topvisor_list_folders",
     "topvisor_list_groups",
     "topvisor_search_regions",
+    "topvisor_check_update",
 }
 WRITE_TOOLS = {
     "topvisor_check_launch",
@@ -127,6 +131,10 @@ async def test_original_surface_runs_and_counts_every_write_and_readback(tmp_pat
             if tool.name not in CONTRACT:
                 assert tool.name in {
                     "topvisor_positions_history",
+                    "topvisor_ai_tracker_settings",
+                    "topvisor_ai_tracker_summary",
+                    "topvisor_ai_tracker_history",
+                    "topvisor_check_update",
                     "topvisor_rank_changes",
                     "topvisor_check_quote",
                     "topvisor_check_launch",
@@ -277,6 +285,7 @@ async def test_installed_stdio_entrypoint_has_real_tools(tmp_path: Path):
             "TOPVISOR_USER_ID": "1",
             "TOPVISOR_API_KEY_FILE": str(credential),
             "TOPVISOR_STATE_PATH": str(tmp_path / "state.sqlite"),
+            "TOPVISOR_DISABLE_UPDATE_CHECK": "1",
         },
         keep_alive=False,
     )
