@@ -51,6 +51,22 @@ All processes serving one provider account must share one local SQLite file on
 one host. Multi-host replicas with separate ledgers are not supported. Back up
 the state together with release metadata; do not erase pending writes on rollback.
 
+## Update check
+
+`topvisor_check_update` compares the installed version with the latest GitHub release
+and returns the release link and an install command; it never installs anything.
+Unless `TOPVISOR_DISABLE_UPDATE_CHECK=1` is set, the server also refreshes this check
+in the background at startup, which means an anonymous HTTPS request to
+`api.github.com` at most once a day. For HTTP/server deployments without outbound
+internet access, or where such requests are not allowed, set the variable.
+
+The result is cached in `update-check.json` next to the state database for 24 hours.
+Every attempt is recorded there: after a failed attempt nothing is fetched for 30
+minutes, and `force_refresh` is honoured at most once a minute. Only plain numeric
+release tags (`v1.2.3`) are accepted; anything else counts as "no release". The tool
+runs through the standard runtime (verified actor, audit record, deadline) but does
+not touch Topvisor, so it spends no Topvisor quota and is not blocked by a cooldown.
+
 ## Embedding in a gateway
 
 The package exports `zai_topvisor.adapter.TopvisorAdapter` and

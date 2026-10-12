@@ -55,6 +55,11 @@ use private ACLs; the wizard restricts its new secrets directory to the current 
 and SYSTEM. Pre-existing provider files require equivalent protection by the operator.
 Keep SQLite state across upgrades. Never delete it to retry an unknown write.
 
+At startup the server checks the latest GitHub release with an anonymous request to
+`api.github.com` (at most once a day) and only suggests an update; it never installs
+anything. Add `"TOPVISOR_DISABLE_UPDATE_CHECK": "1"` to the `env` object to turn this
+off, for example on servers without outbound internet access.
+
 ## MCP clients
 
 Use an absolute checkout path (forward slashes work in JSON on Windows, e.g.

@@ -276,11 +276,16 @@ def create_server(
         instructions=cached_hint(update_cache),
     )
     runtime = Runtime(config, transport, http_factory)
-    register_tools(ToolRegistrar(server, runtime), runtime)
-    register_report(ToolRegistrar(server, runtime), runtime)
-    register_checks(ToolRegistrar(server, runtime), runtime)
+    registrar = ToolRegistrar(server, runtime)
+    register_tools(registrar, runtime)
+    register_report(registrar, runtime)
+    register_checks(registrar, runtime)
 
-    @server.tool(
+    # Registered like every other tool, so it gets the verified actor, a durable execution
+    # record and the call deadline. It only talks to GitHub and never uses runtime.topvisor(),
+    # so no Topvisor attempt is admitted: it spends no quota, takes no concurrency lease and
+    # neither sets nor waits for a provider cooldown.
+    @registrar.tool(
         auth=runtime.require_scopes("topvisor:read"),
         annotations={
             "readOnlyHint": True,
