@@ -4,6 +4,8 @@
 
 **Keep your keyword research and ranking history in the conversation.**
 
+> MCP server for Topvisor: saved rankings, keyword inventory, AI-answer tracker and quoted, budget-capped paid rank checks.
+
 Ask your assistant to inspect a project, prepare keyword groups or find queries that lost positions in saved reports. Topvisor MCP connects those tasks to your existing projects, with previews before supported changes are applied.
 
 [Quick start](#quick-start) · [Connect your assistant](#connect-your-assistant) · [Issues](https://github.com/zai-one/topvisor-mcp/issues)
@@ -24,6 +26,20 @@ Try asking your assistant:
 | Run a controlled check | Get a price quote, confirm its cost and launch once within operator-defined projects and estimate limits. |
 
 [Ranking reports and paid-check walkthrough](docs/RANKINGS.md) includes requests, local configuration and recovery from an uncertain launch.
+
+## Why this MCP
+
+- Reads use saved data and are free; a paid check needs `topvisor_balance` → `topvisor_check_quote` → confirmation, within operator-set project and cost limits.
+- Toolsets (meta, positions, ai_tracker, checks, setup_write) and read-only mode; writes are previewed before they are applied.
+- Ranking comparisons and exports keep missing values distinct from ranks (JSON/CSV).
+- Other Topvisor MCP servers on GitHub ([SCom-82/topvisor-mcp](https://github.com/SCom-82/topvisor-mcp), [psilon2000/topvisor-mcp](https://github.com/psilon2000/topvisor-mcp)) have no CI workflow; psilon2000 guards writes with `confirm=true` but has no price quote or budget cap.
+
+## Maintained and up to date
+
+- Actively maintained by ZAI.ONE: current version 0.4.0; release notes in [CHANGELOG.md](CHANGELOG.md) and [Releases](https://github.com/zai-one/topvisor-mcp/releases).
+- Built-in update check: ask the assistant to run `topvisor_check_update` (public GitHub API, no credentials, cached; nothing is installed automatically; `TOPVISOR_DISABLE_UPDATE_CHECK=1` turns it off).
+- Follows current MCP practice: tool annotations (read-only / destructive hints), toolsets and read-only mode, server `instructions`, prompts and resources, structured errors with recovery hints, secrets kept out of tool output, a token budget for tool descriptions enforced in tests.
+- CI runs the test suite on Linux and Windows for every pull request.
 
 ## Quick start
 
@@ -182,9 +198,9 @@ Tests use synthetic fixtures. A passing test run does not establish live provide
 
 [ZAI.ONE](https://zai.one) is a digital agency working on websites, SEO, advertising and analytics. We also build tools that connect AI assistants to everyday work. [Talk to us on Telegram](https://t.me/zai_one) about setup, automation or an integration for your team.
 
-## Use and feedback
+## License, use and contributing
 
-You may install and use this project for your own accounts under [LicenseRef-ZAI-ONE](LICENSE).
-This is not an open-source license. Third-party notices remain in [NOTICE](NOTICE).
-If it helps, give the repository a ⭐. Missing something or found a bug? [Open an issue](https://github.com/zai-one/topvisor-mcp/issues/new/choose).
-I'm working on this project; accepted improvements are implemented here. Support is not guaranteed.
+- **Use:** you may install and use this MCP server freely for yourself and your organisation, including commercial work. If it helps, please consider giving the repository a ⭐ — appreciated, never required.
+- **Contribute:** [issues](https://github.com/zai-one/topvisor-mcp/issues/new/choose) and pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Never post tokens, cookies, sessions or account data.
+- **Not allowed without written permission from ZAI.ONE:** copying code into other projects, forking for redistribution, embedding the server in other products or offering it as a competing service.
+- License: [LicenseRef-ZAI-ONE 2.0](LICENSE) (source-available, not open source). Third-party notices and license history: [NOTICE](NOTICE).

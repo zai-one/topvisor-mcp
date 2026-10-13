@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- License: LicenseRef-ZAI-ONE 2.0 (source-available). Free install and use for yourself and your organisation, including commercial work; issues and pull requests welcome; copying code into other projects, redistribution, embedding and competing hosted services need written permission. Earlier releases keep their LicenseRef-ZAI-ONE 1.0 terms (see NOTICE). README first screen: one-line scope, why this MCP, maintenance and update check.
+
 - Agent layer: router `instructions` (≤1200 chars), compact template descriptions (when to use / neighbour tool / cost) and titles on every tool.
 - Toolsets `meta`, `positions`, `ai_tracker`, `checks`, `setup_write` via `TOPVISOR_TOOLSETS`, `TOPVISOR_TOOLS`, `TOPVISOR_DISABLED_TOOLS`, `TOPVISOR_READ_ONLY=1`; resource `topvisor://toolsets`.
 - Resources `topvisor://playbook`, `topvisor://guide/{topic}` (pricing, report-template, errors); prompts `weekly_report`, `check_positions`.
