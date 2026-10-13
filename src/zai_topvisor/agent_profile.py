@@ -31,7 +31,8 @@ DESCRIPTIONS = {
     "topvisor_search_regions": "Search the region catalog for a search engine. Use before add/import "
     "regions; for regions already in a project use `topvisor_get_project_setup`. Cost: free.",
     "topvisor_positions_history": "Read saved positions for 1-31 dates. Use for trends; for a two-date "
-    'diff use `topvisor_rank_changes`. Cost: free. format="matrix" returns a compact keyword x date grid.',
+    'diff use `topvisor_rank_changes`. Cost: free. format="matrix" returns a compact keyword x date grid; '
+    "page keywords with next_offset.",
     "topvisor_rank_changes": "Compare saved ranks and URLs between two dates. Use for weekly reports; for "
     "many dates use `topvisor_positions_history`. Cost: free. Returns rows with delta and URL summary.",
     "topvisor_ai_tracker_settings": "Read AI-tracker settings and model keys. Use before AI summary/history. "

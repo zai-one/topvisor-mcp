@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import partial
-from typing import Any, cast
+from typing import Any, Literal, cast
 from urllib.parse import urlsplit
 
 from zai_topvisor.adapter import (
@@ -19,6 +19,7 @@ from zai_topvisor.adapter import (
     TopvisorAdapter,
     normalize_keyword,
 )
+from zai_topvisor.rank_reports import next_offset, rank
 from zai_topvisor.transport import ProviderError
 
 # MCP tool annotations (hints for clients; enforcement stays server-side).
@@ -34,13 +35,23 @@ DRY_RUN_OVERWRITE = {**DRY_RUN_WRITE, "destructiveHint": True}
 
 
 def positions_matrix(
-    payload: Any, project_id: int, region_indexes: list[int], dates: list[str]
+    payload: Any,
+    project_id: int,
+    region_indexes: list[int],
+    dates: list[str],
+    limit: int = 100,
+    offset: int = 0,
 ) -> dict[str, Any]:
-    """Compact keyword x date grid: one row per keyword and region, positions only (None = absent)."""
+    """Compact keyword x date grid: one row per keyword and region, positions only.
+
+    A cell is the rank, "--" when the check found the keyword outside the checked depth, or
+    None when no valid saved position exists. Keywords are paged: continue with next_offset.
+    """
     result = payload.get("result") if isinstance(payload, dict) else None
     keywords = result.get("keywords") if isinstance(result, dict) else None
+    keywords = keywords if isinstance(keywords, list) else []
     rows: list[list[Any]] = []
-    for keyword in keywords if isinstance(keywords, list) else []:
+    for keyword in keywords:
         if not isinstance(keyword, dict):
             continue
         cells = keyword.get("positionsData")
@@ -49,10 +60,17 @@ def positions_matrix(
             row: list[Any] = [keyword.get("id"), keyword.get("name"), region]
             for day in dates:
                 cell = cells.get(f"{day}:{project_id}:{region}")
-                value = cell.get("position") if isinstance(cell, dict) else None
-                row.append(value if isinstance(value, int) and value > 0 else None)
+                position, status = rank(cell.get("position") if isinstance(cell, dict) else None)
+                row.append("--" if status == "not_in_depth" else position)
             rows.append(row)
-    return {"columns": ["keyword_id", "keyword", "region_index", *dates], "rows": rows}
+    return {
+        "columns": ["keyword_id", "keyword", "region_index", *dates],
+        "rows": rows,
+        "limit": limit,
+        "offset": offset,
+        "returned_keywords": len(keywords),
+        "next_offset": next_offset(payload, offset, limit, len(keywords)),
+    }
 
 
 def register_tools(server: Any, runtime: Any) -> None:
@@ -71,7 +89,7 @@ def register_tools(server: Any, runtime: Any) -> None:
         limit: int = 100,
         offset: int = 0,
         serp_features: list[str] | None = None,
-        format: str = "raw",
+        format: Literal["raw", "matrix"] = "raw",
     ) -> dict[str, Any]:
         """Read saved positions by date and project region index; never starts checks.
 
@@ -84,8 +102,6 @@ def register_tools(server: Any, runtime: Any) -> None:
         )
         if serp_features:
             arguments["serp_features"] = serp_features
-        if format not in {"raw", "matrix"}:
-            raise safe_provider_error("topvisor", ValueError("format must be raw or matrix"))
         payload = await _provider_read(
             "topvisor",
             "positions_history",
@@ -94,7 +110,7 @@ def register_tools(server: Any, runtime: Any) -> None:
             validate=lambda: adapter.validate_history(**arguments),
         )
         if format == "matrix":
-            return {"matrix": positions_matrix(payload, project_id, region_indexes, dates)}
+            return {"matrix": positions_matrix(payload, project_id, region_indexes, dates, limit, offset)}
         return {"payload": payload}
 
     @server.tool(auth=require_scopes("topvisor:read"), annotations=READ_ONLY)

@@ -38,6 +38,8 @@ async def test_token_budget_and_agent_surface(tmp_path: Path) -> None:
         for tool in tools:
             assert tool.description and len(tool.description) <= DESCRIPTION_LIMIT, tool.name
             assert tool.title and tool.annotations is not None
+        history = next(tool for tool in tools if tool.name == "topvisor_positions_history")
+        assert history.inputSchema["properties"]["format"]["enum"] == ["raw", "matrix"]
         size = len(json.dumps([tool.model_dump(exclude_none=True) for tool in tools]))
         assert size <= TOOLS_LIST_BUDGET
         uris = {str(item.uri) for item in await client.list_resources()}
@@ -79,12 +81,29 @@ def test_positions_matrix_is_compact() -> None:
             "keywords": [
                 {"id": 1, "name": "a", "positionsData": {"2026-10-01:7:0": {"position": 4}}},
                 {"id": 2, "name": "b", "positionsData": {"2026-10-01:7:0": {"position": "--"}}},
+                {"id": 3, "name": "c", "positionsData": {"2026-10-01:7:0": {"position": "12"}}},
             ]
         }
     }
     matrix = positions_matrix(payload, 7, [0], ["2026-10-01", "2026-10-08"])
     assert matrix["columns"] == ["keyword_id", "keyword", "region_index", "2026-10-01", "2026-10-08"]
-    assert matrix["rows"] == [[1, "a", 0, 4, None], [2, "b", 0, None, None]]
+    # Decimal strings rank like rank_changes; "--" (checked, not in depth) differs from no data.
+    assert matrix["rows"] == [[1, "a", 0, 4, None], [2, "b", 0, "--", None], [3, "c", 0, 12, None]]
+    assert matrix["next_offset"] is None and matrix["returned_keywords"] == 3
+
+
+def test_positions_matrix_keeps_paging() -> None:
+    # A 300-keyword project read 100 at a time must not look complete after the first page.
+    keywords = [{"id": i, "name": f"k{i}", "positionsData": {}} for i in range(1, 101)]
+    payload = {"result": {"keywords": keywords}, "nextOffset": 100}
+    matrix = positions_matrix(payload, 7, [0], ["2026-10-01"], limit=100, offset=0)
+    assert len(matrix["rows"]) == 100
+    assert (matrix["limit"], matrix["offset"], matrix["next_offset"]) == (100, 0, 100)
+    # Without provider nextOffset a full page still points at the next one.
+    payload = {"result": {"keywords": keywords}}
+    assert positions_matrix(payload, 7, [0], ["2026-10-01"], limit=100, offset=200)["next_offset"] == 300
+    last = {"result": {"keywords": keywords[:40]}}
+    assert positions_matrix(last, 7, [0], ["2026-10-01"], limit=100, offset=200)["next_offset"] is None
 
 
 def test_balance_payload_is_validated() -> None:
