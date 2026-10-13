@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Semantics and analytics coverage, router eval
+
+- API re-check against topvisor-openapi (2026-10): positions summary/chart, snapshots, project competitors, tasks, audit/indexing/watcher summaries, apometr updates, bank history, keyword collection, frequency checks, deduplication and clustering progress were missing.
+- New opt-in toolset `analytics` (off by default; default tools and token budget unchanged): `topvisor_report` over a fixed read allowlist.
+- New opt-in toolset `semantics`: `topvisor_semantics_tools` (free deduplicate, cluster_progress), `topvisor_semantics_price` (collect / volumes price) and `topvisor_semantics_launch` (paid; same operator gate as paid rank checks: write enabled, project allowlisted, cost ≤ TOPVISOR_CHECK_MAX_COST, `approved_cost` equals a fresh price, `confirm_cost=true`).
+- Skill `topvisor-semantic-core` (self-contained semantics -> clusters -> positions), guide `topvisor://guide/semantics`, prompt `semantic_core`.
+- Router: one line per intent (RU/EN -> first tool; skill; guide) with `topvisor://playbook` and the generated `topvisor://guide/tool-map` as fallbacks; `TOPVISOR_TOOLSETS=default|all`.
+- `tests/test_routing_eval.py` + `tests/evals/routing_cases.json` (16 RU/EN requests): fails if any tool, skill or guide is unreachable.
+
 ## 0.5.0
 
 - License: LicenseRef-ZAI-ONE 2.0 (source-available). Free install and use for yourself and your organisation, including commercial work; issues and pull requests welcome; copying code into other projects, redistribution, embedding and competing hosted services need written permission. Earlier releases keep their LicenseRef-ZAI-ONE 1.0 terms (see NOTICE). README first screen: one-line scope, why this MCP, maintenance and update check.

@@ -155,10 +155,15 @@ and open the other files on demand. Clients without skills get the same flows as
 | `topvisor-rank-check-safe` | Paid rank check with balance, quote, explicit approval, one launch, polling. |
 | `topvisor-competitor-tracking` | AI-tracker competitor visibility and keywords lost from TOP-10. |
 | `seo-weekly-client-report` | Agency client report: Topvisor + optional yandex-mcp, roistat-mcp, keysso-mcp. |
+| `topvisor-semantic-core` | Semantics -> clusters -> positions in one project: priced collection and frequencies, dedupe, cluster groups, rank check. |
 
 ## Toolsets and read-only mode
 
-`TOPVISOR_TOOLSETS=all` (default) or a comma list (see `topvisor://toolsets`); `TOPVISOR_TOOLS=a,b` adds single tools,
+Default: `meta`, `positions`, `ai_tracker`, `checks`, `setup_write`. Opt-in: `semantics`
+(`topvisor_semantics_tools`, `topvisor_semantics_price`, `topvisor_semantics_launch`: keyword collection,
+frequency checks, dedupe, clustering progress) and `analytics` (`topvisor_report`: positions summary/chart,
+TOP snapshots, competitors, tasks, audit/indexing/watcher, apometr, bank history).
+`TOPVISOR_TOOLSETS=default`, `all` or a comma list (see `topvisor://toolsets`); `TOPVISOR_TOOLS=a,b` adds single tools,
 `TOPVISOR_DISABLED_TOOLS=a,b` removes them, `TOPVISOR_READ_ONLY=1` removes every write/paid tool.
 
 ## Example requests
