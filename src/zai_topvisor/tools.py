@@ -10,6 +10,7 @@ from zai_topvisor.adapter import (
     ADD_PROJECT_OPERATION,
     ADD_REGION_OPERATION,
     ADD_SEARCHER_OPERATION,
+    BALANCE_OPERATION,
     IMPORT_KEYWORDS_OPERATION,
     IMPORT_REGIONS_OPERATION,
     LEGACY_WRITE_OPERATIONS,
@@ -32,6 +33,28 @@ DRY_RUN_WRITE = {
 DRY_RUN_OVERWRITE = {**DRY_RUN_WRITE, "destructiveHint": True}
 
 
+def positions_matrix(
+    payload: Any, project_id: int, region_indexes: list[int], dates: list[str]
+) -> dict[str, Any]:
+    """Compact keyword x date grid: one row per keyword and region, positions only (None = absent)."""
+    result = payload.get("result") if isinstance(payload, dict) else None
+    keywords = result.get("keywords") if isinstance(result, dict) else None
+    rows: list[list[Any]] = []
+    for keyword in keywords if isinstance(keywords, list) else []:
+        if not isinstance(keyword, dict):
+            continue
+        cells = keyword.get("positionsData")
+        cells = cells if isinstance(cells, dict) else {}
+        for region in region_indexes:
+            row: list[Any] = [keyword.get("id"), keyword.get("name"), region]
+            for day in dates:
+                cell = cells.get(f"{day}:{project_id}:{region}")
+                value = cell.get("position") if isinstance(cell, dict) else None
+                row.append(value if isinstance(value, int) and value > 0 else None)
+            rows.append(row)
+    return {"columns": ["keyword_id", "keyword", "region_index", *dates], "rows": rows}
+
+
 def register_tools(server: Any, runtime: Any) -> None:
     registry = runtime
     settings = runtime
@@ -48,6 +71,7 @@ def register_tools(server: Any, runtime: Any) -> None:
         limit: int = 100,
         offset: int = 0,
         serp_features: list[str] | None = None,
+        format: str = "raw",
     ) -> dict[str, Any]:
         """Read saved positions by date and project region index; never starts checks.
 
@@ -60,15 +84,18 @@ def register_tools(server: Any, runtime: Any) -> None:
         )
         if serp_features:
             arguments["serp_features"] = serp_features
-        return {
-            "payload": await _provider_read(
-                "topvisor",
-                "positions_history",
-                arguments,
-                lambda: adapter.positions_history(**arguments),
-                validate=lambda: adapter.validate_history(**arguments),
-            )
-        }
+        if format not in {"raw", "matrix"}:
+            raise safe_provider_error("topvisor", ValueError("format must be raw or matrix"))
+        payload = await _provider_read(
+            "topvisor",
+            "positions_history",
+            arguments,
+            lambda: adapter.positions_history(**arguments),
+            validate=lambda: adapter.validate_history(**arguments),
+        )
+        if format == "matrix":
+            return {"matrix": positions_matrix(payload, project_id, region_indexes, dates)}
+        return {"payload": payload}
 
     @server.tool(auth=require_scopes("topvisor:read"), annotations=READ_ONLY)
     async def topvisor_ai_tracker_settings(
@@ -143,6 +170,20 @@ def register_tools(server: Any, runtime: Any) -> None:
                 arguments,
                 lambda: adapter.ai_tracker_history(**arguments),
                 validate=lambda: TopvisorAdapter.validate_ai_history(**arguments),
+            )
+        }
+
+    @server.tool(auth=require_scopes("topvisor:read"), annotations=READ_ONLY)
+    async def topvisor_balance() -> dict[str, Any]:
+        """Read the Topvisor account balance (bank_2/info); free, never spends money."""
+        adapter = registry.topvisor()
+        return {
+            "payload": await _provider_read(
+                "topvisor",
+                "balance",
+                {},
+                adapter.balance,
+                validate=lambda: adapter.validate_payload(BALANCE_OPERATION, {}),
             )
         }
 

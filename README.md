@@ -76,6 +76,85 @@ You should see your projects and their existing settings. You can then request s
 
 If tools do not appear, check the absolute path, whether the client can find `uv`, and the `--check-config` result. For access errors, check account credentials and permissions. [Installation and troubleshooting](INSTALL.md).
 
+
+<!-- agent-block:start -->
+## Install in your agent
+
+Run `topvisor-mcp` straight from GitHub with [uv](https://docs.astral.sh/uv/). Pin a release tag (`@vX.Y.Z`) for
+reproducible installs; placeholders below are examples, keep secrets in files outside the repo.
+
+**Claude Code**
+
+```bash
+claude mcp add topvisor --env TOPVISOR_USER_ID=123456 --env TOPVISOR_API_KEY_FILE=/path/to/topvisor.token --env TOPVISOR_STATE_PATH=/path/to/topvisor.sqlite -- uvx --from git+https://github.com/zai-one/topvisor-mcp topvisor-mcp
+```
+
+Skills for Claude Code: copy `skills/*` into `~/.claude/skills/` (or install this repo as a plugin — it
+ships `.claude-plugin/plugin.json` with the skills and the MCP server).
+
+**Cursor** — `.cursor/mcp.json` ([one-click install](cursor://anysphere.cursor-deeplink/mcp/install?name=topvisor&config=eyJjb21tYW5kIjogInV2eCIsICJhcmdzIjogWyItLWZyb20iLCAiZ2l0K2h0dHBzOi8vZ2l0aHViLmNvbS96YWktb25lL3RvcHZpc29yLW1jcCIsICJ0b3B2aXNvci1tY3AiXSwgImVudiI6IHsiVE9QVklTT1JfVVNFUl9JRCI6ICIxMjM0NTYiLCAiVE9QVklTT1JfQVBJX0tFWV9GSUxFIjogIi9wYXRoL3RvL3RvcHZpc29yLnRva2VuIiwgIlRPUFZJU09SX1NUQVRFX1BBVEgiOiAiL3BhdGgvdG8vdG9wdmlzb3Iuc3FsaXRlIn19)):
+
+```json
+{
+  "mcpServers": {
+    "topvisor": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/zai-one/topvisor-mcp",
+        "topvisor-mcp"
+      ],
+      "env": {
+        "TOPVISOR_USER_ID": "123456",
+        "TOPVISOR_API_KEY_FILE": "/path/to/topvisor.token",
+        "TOPVISOR_STATE_PATH": "/path/to/topvisor.sqlite"
+      }
+    }
+  }
+}
+```
+
+**Codex** — `~/.codex/config.toml` (skills: copy `skills/*` into `~/.codex/skills/`, or keep the
+repo's `.agents/skills` link):
+
+```toml
+[mcp_servers.topvisor]
+command = "uvx"
+args = ["--from", "git+https://github.com/zai-one/topvisor-mcp", "topvisor-mcp"]
+env = { TOPVISOR_USER_ID = "123456", TOPVISOR_API_KEY_FILE = "/path/to/topvisor.token", TOPVISOR_STATE_PATH = "/path/to/topvisor.sqlite" }
+```
+
+**Claude Desktop** — `claude_desktop_config.json`: the same `mcpServers` block as Cursor.
+
+## Skills (agent playbooks)
+
+Each skill is a self-contained folder `skills/<name>/` (`SKILL.md` + its own `references/`,
+`templates/`); copy the folder and it works. Agents load the short `SKILL.md` only when the task matches
+and open the other files on demand. Clients without skills get the same flows as MCP prompts and the
+`topvisor://playbook` / `topvisor://guide/{topic}` resources.
+
+| Skill | What it does |
+|---|---|
+| `topvisor-weekly-report` | Weekly ranking report from saved positions: TOP-3/10/30, movers, URL changes (free). |
+| `topvisor-rank-check-safe` | Paid rank check with balance, quote, explicit approval, one launch, polling. |
+| `topvisor-competitor-tracking` | AI-tracker competitor visibility and keywords lost from TOP-10. |
+| `seo-weekly-client-report` | Agency client report: Topvisor + optional yandex-mcp, roistat-mcp, keysso-mcp. |
+
+## Toolsets and read-only mode
+
+`TOPVISOR_TOOLSETS=all` (default) or a comma list (see `topvisor://toolsets`); `TOPVISOR_TOOLS=a,b` adds single tools,
+`TOPVISOR_DISABLED_TOOLS=a,b` removes them, `TOPVISOR_READ_ONLY=1` removes every write/paid tool.
+
+## Example requests
+
+- Покажи мои проекты Topvisor и регионы проекта X.
+- Сделай недельный отчёт по позициям проекта X (без платных проверок).
+- Сколько стоит обновить позиции по проекту X? Запусти только после моего OK.
+- Какие запросы выпали из ТОП-10 за неделю?
+- Как бренд виден в AI-ответах по сравнению с конкурентами?
+- Собери еженедельный SEO-отчёт клиенту.
+<!-- agent-block:end -->
+
 ## Access and limits
 
 Ranking reports read history already saved in Topvisor. Paid checks use a separate quote and confirmation workflow, disabled until the operator sets project and estimate limits. Keyword changes default to a preview. Deletion is unavailable; history uses project region indexes. [Limits and reconciliation](docs/RANKINGS.md).

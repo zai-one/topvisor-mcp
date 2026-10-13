@@ -114,6 +114,9 @@ AI_SETTINGS_OPERATION = ("get", "aiTracker_2", "settings")
 AI_SUMMARY_OPERATION = ("get", "aiTracker_2", "summary")
 AI_HISTORY_OPERATION = ("get", "aiTracker_2", "history")
 AI_OPERATIONS = frozenset({AI_SETTINGS_OPERATION, AI_SUMMARY_OPERATION, AI_HISTORY_OPERATION})
+# Account balance (Bank, bank_2), read-only: https://topvisor.com/api/v2-services/bank_2/info/get/
+BALANCE_OPERATION = ("get", "bank_2", "info")
+BALANCE_FIELDS = frozenset({"balance_all", "balance_personal", "balance_bonus", "balance_plan"})
 ALLOWED_OPERATIONS = frozenset(
     {
         PROJECTS_OPERATION,
@@ -122,6 +125,7 @@ ALLOWED_OPERATIONS = frozenset(
         GROUPS_OPERATION,
         REGIONS_OPERATION,
         HISTORY_OPERATION,
+        BALANCE_OPERATION,
         *AI_OPERATIONS,
     }
 )
@@ -694,6 +698,10 @@ class TopvisorAdapter:
                 payload.get("offset", 0),
                 payload.get("filter_by_serp_features"),
             )
+        if operation == BALANCE_OPERATION:
+            if set(payload) - {"fields"}:
+                raise ValueError("unsupported balance parameter")
+            return {"fields": _fields(payload.get("fields", sorted(BALANCE_FIELDS)), allowed=BALANCE_FIELDS)}
         if operation == AI_SETTINGS_OPERATION:
             if set(payload) - {"project_id", "showAvailableModels"}:
                 raise ValueError("unsupported AI tracker settings parameter")
@@ -979,6 +987,9 @@ class TopvisorAdapter:
                 project_id, models_keys, dates, history_fields, sentiments, limit, offset
             ),
         )
+
+    async def balance(self) -> dict[str, Any]:
+        return await self._read(BALANCE_OPERATION, {"fields": sorted(BALANCE_FIELDS)})
 
     async def projects(
         self,

@@ -20,6 +20,9 @@ from fastmcp.server.dependencies import get_access_token
 
 from zai_topvisor import __version__
 from zai_topvisor.adapter import TopvisorAdapter
+from zai_topvisor.agent_layer import apply as apply_agent_layer
+from zai_topvisor.agent_layer import router_instructions
+from zai_topvisor.agent_profile import PROFILE
 from zai_topvisor.check_store import CheckStore
 from zai_topvisor.coalescing import AsyncSingleFlight
 from zai_topvisor.config import ServiceConfig
@@ -273,7 +276,7 @@ def create_server(
         version=__version__,
         auth=auth,
         mask_error_details=True,
-        instructions=cached_hint(update_cache),
+        instructions=router_instructions(PROFILE, cached_hint(update_cache)),
     )
     runtime = Runtime(config, transport, http_factory)
     registrar = ToolRegistrar(server, runtime)
@@ -302,6 +305,7 @@ def create_server(
         """
         return await asyncio.to_thread(check_update, update_cache, force=force_refresh)
 
+    apply_agent_layer(server, PROFILE)
     return server
 
 

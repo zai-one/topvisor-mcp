@@ -38,6 +38,7 @@ READ_TOOLS = {
     "topvisor_list_groups",
     "topvisor_search_regions",
     "topvisor_check_update",
+    "topvisor_balance",
 }
 WRITE_TOOLS = {
     "topvisor_check_launch",
@@ -131,6 +132,7 @@ async def test_original_surface_runs_and_counts_every_write_and_readback(tmp_pat
             if tool.name not in CONTRACT:
                 assert tool.name in {
                     "topvisor_positions_history",
+                    "topvisor_balance",
                     "topvisor_ai_tracker_settings",
                     "topvisor_ai_tracker_summary",
                     "topvisor_ai_tracker_history",
