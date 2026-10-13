@@ -1,6 +1,6 @@
 {
   "name": "topvisor",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Topvisor rankings, AI tracker and guarded paid rank checks with agent skills",
   "author": {
     "name": "ZAI.ONE",
@@ -15,7 +15,7 @@
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/zai-one/topvisor-mcp",
+        "git+https://github.com/zai-one/topvisor-mcp@v0.5.0",
         "topvisor-mcp"
       ],
       "env": {
