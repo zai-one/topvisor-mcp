@@ -25,6 +25,14 @@ def rank(value):
     return None, "invalid"
 
 
+def next_offset(payload, offset, limit, returned):
+    """Provider nextOffset when plausible, else offset+returned for a full page, else None."""
+    value = payload.get("nextOffset") if isinstance(payload, dict) else None
+    if type(value) is not int or not offset < value <= 100000:
+        value = offset + returned if returned == limit and offset + limit <= 100000 else None
+    return value
+
+
 def csv_text(rows):
     stream = io.StringIO(newline="")
     fields = [
@@ -121,9 +129,7 @@ async def report(runtime, project_id, region_index, before_date, after_date, lim
             else "unchanged"
         )
         summary[group] += 1
-    next_offset = payload.get("nextOffset")
-    if type(next_offset) is not int or not offset < next_offset <= 100000:
-        next_offset = offset + len(keywords) if len(keywords) == limit and offset + limit <= 100000 else None
+    following = next_offset(payload, offset, limit, len(keywords))
     result = dict(
         project_id=project_id,
         region_index=region_index,
@@ -137,7 +143,7 @@ async def report(runtime, project_id, region_index, before_date, after_date, lim
             "offset": offset,
             "limit": limit,
             "returned_keywords": len(keywords),
-            "next_offset": next_offset,
+            "next_offset": following,
             "provider_completeness": "not_asserted",
             "snapshot": "saved_history_read_at_request_time",
         },

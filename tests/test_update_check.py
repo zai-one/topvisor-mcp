@@ -10,6 +10,7 @@ from fastmcp.server.auth.providers.jwt import RSAKeyPair
 from test_server import Recorder, config, connection, token
 
 from zai_topvisor import __version__, update_check
+from zai_topvisor.agent_profile import PROFILE
 from zai_topvisor.policy import PolicyStore
 from zai_topvisor.server import create_server
 
@@ -161,7 +162,7 @@ async def test_tool_and_startup_hint_use_cache_without_blocking(tmp_path, monkey
 
 def test_no_hint_without_cache(tmp_path):
     settings = config(tmp_path, RSAKeyPair.generate())
-    assert create_server(settings, transport="stdio").instructions is None
+    assert create_server(settings, transport="stdio").instructions == PROFILE.router
 
 
 def test_injected_tag_never_reaches_result_cache_or_instructions(tmp_path):
@@ -176,7 +177,7 @@ def test_injected_tag_never_reaches_result_cache_or_instructions(tmp_path):
     tampered = {"latest_version": INJECTION, "release_url": update_check.RELEASES_URL}
     cache.write_text(json.dumps({**tampered, "checked_at": 1e12}))
     assert update_check.cached_hint(cache) is None
-    tampered_url = {"latest_version": "99.0", "release_url": f"{update_check.RELEASES_URL}/x\"; sh"}
+    tampered_url = {"latest_version": "99.0", "release_url": f'{update_check.RELEASES_URL}/x"; sh'}
     cache.write_text(json.dumps({**tampered_url, "checked_at": time.time()}))
     assert update_check.cached_hint(cache) is None
     counter = Counter(RELEASE)
@@ -190,7 +191,7 @@ async def test_injected_cache_never_reaches_server_instructions(tmp_path):
     cache.parent.mkdir(parents=True, exist_ok=True)
     record = {"latest_version": INJECTION, "release_url": update_check.RELEASES_URL}
     cache.write_text(json.dumps({**record, "checked_at": time.time()}))
-    assert create_server(settings, transport="stdio").instructions is None
+    assert create_server(settings, transport="stdio").instructions == PROFILE.router
 
 
 def test_version_parsing_accepts_plain_ascii_tags_only():

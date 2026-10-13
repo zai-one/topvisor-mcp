@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Agent layer: router `instructions` (≤1200 chars), compact template descriptions (when to use / neighbour tool / cost) and titles on every tool.
+- Toolsets `meta`, `positions`, `ai_tracker`, `checks`, `setup_write` via `TOPVISOR_TOOLSETS`, `TOPVISOR_TOOLS`, `TOPVISOR_DISABLED_TOOLS`, `TOPVISOR_READ_ONLY=1`; resource `topvisor://toolsets`.
+- Resources `topvisor://playbook`, `topvisor://guide/{topic}` (pricing, report-template, errors); prompts `weekly_report`, `check_positions`.
+- Self-contained skills: `topvisor-weekly-report`, `topvisor-rank-check-safe`, `topvisor-competitor-tracking`, cross-service `seo-weekly-client-report`; Claude Code plugin manifest, Cursor rule, `.agents/skills`.
+- New read-only `topvisor_balance` (`bank_2/info`); `topvisor_positions_history(format="matrix")` compact keyword × date grid with `limit`/`offset`/`next_offset` paging and the same rank parsing as `topvisor_rank_changes` (`"--"` = not in depth, `null` = no data).
+- `scripts/token_budget.py` + tests gate instructions, description and SKILL.md sizes.
+
 ## 0.4.0
 
 - `topvisor_positions_history` accepts `serp_features` (`filter_by_serp_features`: `aiOverviewExists`, `images`, `video`, `knowledge`, `maps`), added to the Topvisor OpenAPI on 2026-10-08.

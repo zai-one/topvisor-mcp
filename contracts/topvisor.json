@@ -25,7 +25,7 @@
         "additionalProperties": true,
         "type": "object"
       },
-      "description": "List bounded Topvisor projects through the server-side credential."
+      "description": "List projects with IDs and URLs. Use first to resolve project_id; for one project's engines/regions use `topvisor_get_project_setup`. Cost: free. Paged by limit/offset."
     },
     "topvisor_list_keywords": {
       "inputSchema": {
@@ -56,7 +56,7 @@
         "additionalProperties": true,
         "type": "object"
       },
-      "description": "List bounded Topvisor keyword metadata for one project; never runs checks."
+      "description": "List keyword metadata for a project. Use for inventory; for rankings use `topvisor_positions_history`. Cost: free; never runs checks. Paged by limit/offset."
     },
     "topvisor_get_project_setup": {
       "inputSchema": {
@@ -75,7 +75,7 @@
         "additionalProperties": true,
         "type": "object"
       },
-      "description": "Read one Topvisor project with its configured searchers and regions."
+      "description": "Read one project's searchers and regions (region_index). Use before positions or quotes; to find new regions use `topvisor_search_regions`. Cost: free."
     },
     "topvisor_list_folders": {
       "inputSchema": {
@@ -110,7 +110,7 @@
         "additionalProperties": true,
         "type": "object"
       },
-      "description": "List bounded keyword folders for one Topvisor project."
+      "description": "List keyword folders of a project. Use before imports; for groups use `topvisor_list_groups`. Cost: free."
     },
     "topvisor_list_groups": {
       "inputSchema": {
@@ -141,7 +141,7 @@
         "additionalProperties": true,
         "type": "object"
       },
-      "description": "List bounded keyword groups for one Topvisor project."
+      "description": "List keyword groups of a project. Use before imports; for folders use `topvisor_list_folders`. Cost: free."
     },
     "topvisor_search_regions": {
       "inputSchema": {
@@ -194,7 +194,7 @@
         "additionalProperties": true,
         "type": "object"
       },
-      "description": "Search Topvisor's region catalog for a search engine without mutation."
+      "description": "Search the region catalog for a search engine. Use before add/import regions; for regions already in a project use `topvisor_get_project_setup`. Cost: free."
     },
     "topvisor_create_project": {
       "inputSchema": {
@@ -253,7 +253,7 @@
         "additionalProperties": true,
         "type": "object"
       },
-      "description": "Create one project idempotently; dry-run is the default."
+      "description": "Create a project (dry-run default). Use for onboarding; apply=true only after user confirms the preview. Writes: idempotent."
     },
     "topvisor_create_folder": {
       "inputSchema": {
@@ -295,7 +295,7 @@
         "additionalProperties": true,
         "type": "object"
       },
-      "description": "Create one project folder idempotently; dry-run is the default."
+      "description": "Create a keyword folder (dry-run default). Use before imports; apply=true after confirmation. Writes: idempotent."
     },
     "topvisor_create_groups": {
       "inputSchema": {
@@ -344,7 +344,7 @@
         "additionalProperties": true,
         "type": "object"
       },
-      "description": "Create missing groups in one folder; dry-run is the default."
+      "description": "Create missing groups in a folder (dry-run default). apply=true after confirmation. Writes: idempotent."
     },
     "topvisor_import_keywords": {
       "inputSchema": {
@@ -386,7 +386,7 @@
         "additionalProperties": true,
         "type": "object"
       },
-      "description": "Import at most 1,000 missing keywords with targets/folders/groups; dry-run by default."
+      "description": "Import up to 1,000 missing keywords with targets/folders/groups (dry-run default). Prefer over `topvisor_add_keywords`. Writes: apply=true after confirmation."
     },
     "topvisor_add_keywords": {
       "inputSchema": {
@@ -432,7 +432,7 @@
         "additionalProperties": true,
         "type": "object"
       },
-      "description": "Compatibility workflow: import missing keywords under one explicit folder path."
+      "description": "Legacy: import keywords under one folder path. Prefer `topvisor_import_keywords`. Writes: dry-run default."
     },
     "topvisor_set_keyword_target": {
       "inputSchema": {
@@ -474,7 +474,7 @@
         "additionalProperties": true,
         "type": "object"
       },
-      "description": "Set one keyword target URL; dry-run is the default."
+      "description": "Set one keyword's target URL (dry-run default; overwrites). Writes: apply=true after confirmation."
     },
     "topvisor_set_keyword_tags": {
       "inputSchema": {
@@ -523,7 +523,7 @@
         "additionalProperties": true,
         "type": "object"
       },
-      "description": "Set/add/remove Topvisor color tags 1..10 on one keyword; dry-run by default."
+      "description": "Set/add/remove color tags 1..10 on a keyword (dry-run default). Writes: apply=true after confirmation."
     },
     "topvisor_add_searcher": {
       "inputSchema": {
@@ -568,7 +568,7 @@
         "additionalProperties": true,
         "type": "object"
       },
-      "description": "Add one search engine to a project; dry-run is the default."
+      "description": "Add a search engine to a project (dry-run default). Then add regions with `topvisor_add_region`. Writes: apply=true after confirmation."
     },
     "topvisor_add_region": {
       "inputSchema": {
@@ -646,7 +646,7 @@
         "additionalProperties": true,
         "type": "object"
       },
-      "description": "Add one region/depth configuration to a project; dry-run by default."
+      "description": "Add one region/depth to a project searcher (dry-run default). For many use `topvisor_import_regions`. Writes: apply=true after confirmation."
     },
     "topvisor_import_regions": {
       "inputSchema": {
@@ -688,7 +688,7 @@
         "additionalProperties": true,
         "type": "object"
       },
-      "description": "Import bounded searcher/region rows; dry-run is the default."
+      "description": "Import searcher/region rows in bulk (dry-run default). Find keys with `topvisor_search_regions`. Writes: apply=true after confirmation."
     },
     "topvisor_apply": {
       "inputSchema": {
@@ -726,7 +726,7 @@
         "additionalProperties": true,
         "type": "object"
       },
-      "description": "Legacy single keyword/group write; prefer the typed dry-run tools."
+      "description": "Legacy single keyword/group write. Prefer the typed dry-run tools. Writes: dry-run default."
     }
   }
 }
