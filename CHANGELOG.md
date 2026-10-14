@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased — Semantics and analytics coverage, router eval
+
+- Optional lazy tool loading (`TOPVISOR_TOOL_LOADING=eager|lazy`, default `eager` = unchanged): lazy lists a small core plus `topvisor_enable_toolsets` (toolsets with one-line description and token cost); enabling registers the tools at runtime and sends `notifications/tools/list_changed`. Allowlists, read-only mode and approval gates still apply. Setup wizard asks eager vs lazy. Startup tokens (tools/list + instructions, ≈chars/4): eager ≈5561, lazy ≈1196. Scope: enablement is per MCP session (FastMCP session visibility), so one client's enabled toolsets never appear for another. The HTTP transport here is stateless (every request is its own session), so enabled toolsets do not persist there: for shared HTTP use `eager` or `TOPVISOR_TOOLSETS`. README lazy section lists verified `tools/list_changed` client support with sources.
+- Paid tasks `relevants` and `indexing` (projects_2/tasks) in `topvisor_semantics_price` / `_launch`; every paid `topvisor_semantics_launch` now also needs an operator-accepted, request-bound approval (`topvisor-approval`). Paid semantics launches reserve their estimate against `TOPVISOR_CHECK_DAILY_BUDGET` (shared with paid rank checks; an unknown dispatch outcome stays counted). Approvals are bound to the preparing actor and the approval file is locked across processes, so a concurrent write cannot revive a consumed approval.
+- `topvisor_competitors_write` (opt-in toolset `competitors_write`): add/del/import, edit name/brand/on/move, approval-gated.
+- Snapshots no longer send or require `region_index` (not in the OpenAPI for snapshots_2); positions summaries still require it.
+
+- Review fixes (topvisor-openapi): `search_updates` sends required `region_index` + `date`; summary/chart/snapshot reports require `date1`+`date2`; keyword collection into a group sends `in_one_group=true` with `to_group_id`.
+
+- API re-check against topvisor-openapi (2026-10): positions summary/chart, snapshots, project competitors, tasks, audit/indexing/watcher summaries, apometr updates, bank history, keyword collection, frequency checks, deduplication and clustering progress were missing.
+- New opt-in toolset `analytics` (off by default; default tools and token budget unchanged): `topvisor_report` over a fixed read allowlist.
+- New opt-in toolset `semantics`: `topvisor_semantics_tools` (free deduplicate, cluster_progress), `topvisor_semantics_price` (collect / volumes price) and `topvisor_semantics_launch` (paid; same operator gate as paid rank checks: write enabled, project allowlisted, cost ≤ TOPVISOR_CHECK_MAX_COST, `approved_cost` equals a fresh price, `confirm_cost=true`).
+- Skill `topvisor-semantic-core` (self-contained semantics -> clusters -> positions), guide `topvisor://guide/semantics`, prompt `semantic_core`.
+- Router: one line per intent (RU/EN -> first tool; skill; guide) with `topvisor://playbook` and the generated `topvisor://guide/tool-map` as fallbacks; `TOPVISOR_TOOLSETS=default|all`.
+- `tests/test_routing_eval.py` + `tests/evals/routing_cases.json` (20 RU/EN requests incl. paraphrases and negative cases): fails if any tool, skill or guide is unreachable.
+
 ## 0.5.0
 
 - License: LicenseRef-ZAI-ONE 2.0 (source-available). Free install and use for yourself and your organisation, including commercial work; issues and pull requests welcome; copying code into other projects, redistribution, embedding and competing hosted services need written permission. Earlier releases keep their LicenseRef-ZAI-ONE 1.0 terms (see NOTICE). README first screen: one-line scope, why this MCP, maintenance and update check.

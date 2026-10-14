@@ -2,18 +2,32 @@
 
 from __future__ import annotations
 
-from zai_topvisor.agent_layer import Profile, Prompt
+from zai_topvisor.agent_layer import Profile, Prompt, Route, build_router
 
-ROUTER = """Topvisor MCP: saved SEO rankings, keyword inventory, AI-tracker and guarded paid rank checks.
-Toolsets: meta, positions, ai_tracker, checks, setup_write (see topvisor://toolsets).
-Start: topvisor_list_projects -> topvisor_get_project_setup for project_id/region_index. Never guess IDs.
-Reads are free and use saved data. Fresh rank checks cost money: topvisor_balance -> topvisor_check_quote \
--> show price to user -> topvisor_check_launch(quote) only after explicit OK -> topvisor_check_status.
-Writes are dry-run by default; re-run with apply=true only after the user confirms the preview.
-Reports: positions_history(format="matrix") or rank_changes (two dates) keep output small.
-Playbooks: skills topvisor-weekly-report, topvisor-rank-check-safe, topvisor-competitor-tracking, \
-seo-weekly-client-report; or topvisor://playbook, topvisor://guide/{pricing,report-template,errors}.
-Errors: retry only when the error says retryable; follow its hint."""
+ROUTES = (
+    Route("weekly", "позиции за неделю, динамика, weekly", "topvisor_rank_changes",
+          "topvisor-weekly-report", "report-template"),
+    Route("client", "отчёт клиенту, client report", "topvisor_rank_changes",
+          "seo-weekly-client-report", "report-template"),
+    Route("check", "съём позиций, обновить, fresh check", "topvisor_check_quote",
+          "topvisor-rank-check-safe", "pricing"),
+    Route("competitors", "конкуренты, видимость, сводка, competitors", "topvisor_positions_history",
+          "topvisor-competitor-tracking", "tool-map"),
+    Route("semantics", "семантика, подбор, частотность, кластеры, ядро", "topvisor_semantics_price",
+          "topvisor-semantic-core", "semantics"),
+    Route("setup", "создать проект, добавить фразы, регион, setup", "topvisor_import_keywords", "",
+          "tool-map"),
+    Route("ai", "нейросети, AI tracker, ChatGPT", "topvisor_ai_tracker_summary", "", "tool-map"),
+    Route("errors", "ошибка, баланс, error, balance", "topvisor_balance", "", "errors"),
+)  # fmt: skip
+
+ROUTER = build_router(
+    "topvisor",
+    "Topvisor MCP: saved rankings, keywords, AI tracker, paid checks; topvisor://toolsets. Start: "
+    "topvisor_list_projects -> topvisor_get_project_setup (region_index); never guess IDs.",
+    ROUTES,
+    "Paid: balance -> quote/price -> user OK -> launch. Writes dry-run; apply=true after OK.",
+)
 
 DESCRIPTIONS = {
     "topvisor_balance": "Read the account balance. Use before any paid check; for a check price use "
@@ -69,6 +83,16 @@ DESCRIPTIONS = {
     "`topvisor_search_regions`. Writes: apply=true after confirmation.",
     "topvisor_apply": "Legacy single keyword/group write. Prefer the typed dry-run tools. "
     "Writes: dry-run default.",
+    "topvisor_report": "Read project summaries. Covers positions summary/chart (tops, avg, visibility), "
+    "TOP snapshots, competitors, tasks, audit, apometr updates, bank history. Cost: free.",
+    "topvisor_semantics_tools": "Deduplicate implicit duplicate phrases or read clustering progress. Use "
+    "while cleaning a semantic core. Cost: free.",
+    "topvisor_semantics_price": "Price collect, volumes, relevants (relevance) or indexing tasks. Use "
+    "before `topvisor_semantics_launch`; show the cost. Cost: free.",
+    "topvisor_semantics_launch": "Launch a priced paid task once. Use only after the user approved the "
+    "exact cost and the operator accepted approval_id. Cost: spends balance.",
+    "topvisor_competitors_write": "Add, delete, import, rename, brand, enable or move project competitors. "
+    "Writes: operator approval_id; TOPVISOR_WRITE_ENABLED.",
     "topvisor_check_update": "Check for a newer server release; never installs. Cost: free, 24h cache.",
 }
 
@@ -103,9 +127,25 @@ TOOLSETS = {
         "topvisor_import_regions",
         "topvisor_apply",
     ),
+    "semantics": (
+        "topvisor_semantics_tools",
+        "topvisor_semantics_price",
+        "topvisor_semantics_launch",
+    ),
+    "analytics": ("topvisor_report",),
+    "competitors_write": ("topvisor_competitors_write",),
 }
+OPTIN = ("semantics", "analytics", "competitors_write")
 
 PROMPTS = (
+    Prompt(
+        "semantic_core",
+        "Semantics -> clusters -> positions inside one Topvisor project (paid steps priced first).",
+        ("project", "seeds", "region"),
+        "Build a semantic core in Topvisor project {project} from seeds {seeds} (region {region}) following "
+        "skill topvisor-semantic-core: collect, frequencies, dedupe, groups as clusters, then positions. "
+        "Price every paid step and wait for my OK.",
+    ),
     Prompt(
         "weekly_report",
         "Weekly ranking report for one Topvisor project from saved data (free).",
@@ -132,4 +172,7 @@ PROFILE = Profile(
     descriptions=DESCRIPTIONS,
     toolsets=TOOLSETS,
     prompts=PROMPTS,
+    routes=ROUTES,
+    optin=OPTIN,
+    lazy_core=("topvisor_list_projects", "topvisor_positions_history"),
 )

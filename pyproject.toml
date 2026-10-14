@@ -22,6 +22,7 @@ dev = ["pytest==9.1.1", "pytest-asyncio==1.4.0", "ruff==0.15.21"]
 topvisor-check-reconcile = "zai_topvisor.rank_checks:reconcile_main"
 topvisor-mcp-setup = "zai_topvisor.setup:main"
 topvisor-mcp = "zai_topvisor.server:main"
+topvisor-approval = "zai_topvisor.approvals:cli"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/zai_topvisor"]

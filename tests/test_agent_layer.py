@@ -34,7 +34,8 @@ async def test_token_budget_and_agent_surface(tmp_path: Path) -> None:
         tools = await client.list_tools()
         names = {tool.name for tool in tools}
         assert len(instructions) <= INSTRUCTIONS_LIMIT
-        assert names == {name for group in PROFILE.toolsets.values() for name in group}
+        default = {n for ts, group in PROFILE.toolsets.items() if ts not in PROFILE.optin for n in group}
+        assert names == default
         for tool in tools:
             assert tool.description and len(tool.description) <= DESCRIPTION_LIMIT, tool.name
             assert tool.title and tool.annotations is not None
@@ -47,7 +48,7 @@ async def test_token_budget_and_agent_surface(tmp_path: Path) -> None:
         guide = await client.read_resource("topvisor://guide/errors")
         assert "Topvisor errors" in guide[0].text
         prompts = {prompt.name for prompt in await client.list_prompts()}
-        assert prompts == {"weekly_report", "check_positions"}
+        assert prompts == {"weekly_report", "check_positions", "semantic_core"}
         rendered = await client.get_prompt("check_positions", {"project": "42"})
         assert "42" in rendered.messages[0].content.text
 

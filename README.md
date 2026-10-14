@@ -29,10 +29,25 @@ Try asking your assistant:
 
 ## Why this MCP
 
+- Optional lazy tool loading: set `TOPVISOR_TOOL_LOADING=lazy` (or choose it in the setup wizard) to start with a small core and enable toolsets on demand; see [Lazy tool loading](#lazy-tool-loading).
 - Reads use saved data and are free; a paid check needs `topvisor_balance` → `topvisor_check_quote` → confirmation, within operator-set project and cost limits.
 - Toolsets (meta, positions, ai_tracker, checks, setup_write) and read-only mode; writes are previewed before they are applied.
 - Ranking comparisons and exports keep missing values distinct from ranks (JSON/CSV).
 - Other Topvisor MCP servers on GitHub ([SCom-82/topvisor-mcp](https://github.com/SCom-82/topvisor-mcp), [psilon2000/topvisor-mcp](https://github.com/psilon2000/topvisor-mcp)) have no CI workflow; psilon2000 guards writes with `confirm=true` but has no price quote or budget cap.
+
+## Lazy tool loading
+
+Optional lazy tool loading: `TOPVISOR_TOOL_LOADING=lazy` starts with a small core plus `topvisor_enable_toolsets` and adds toolsets on demand (`tools/list_changed`). Startup cost (tools/list + instructions, ≈chars/4): eager ≈5561 tokens, lazy ≈1196 tokens (−78%). Default `eager` is unchanged; if your client ignores `tools/list_changed`, keep `eager` or reconnect after enabling. Scope: enablement is per MCP session (FastMCP session visibility), so one client's enabled toolsets never appear for another. The HTTP transport here is stateless (every request is its own session), so enabled toolsets do not persist there: for shared HTTP use `eager` or `TOPVISOR_TOOLSETS`.
+
+Clients and `notifications/tools/list_changed` (verified against official docs, changelogs or maintainer statements, 2026-10):
+
+| Client | `tools/list_changed` | Source |
+|---|---|---|
+| Claude Code | Supported (interactive: tools, prompts, resources; `-p`/Agent SDK: tools) | [docs: Dynamic tool updates](https://code.claude.com/docs/en/mcp) |
+| VS Code (GitHub Copilot) | Supported (dynamic tool discovery); new tools may reach the agent only on the next turn | [docs](https://code.visualstudio.com/api/extension-guides/ai/mcp), [#303012](https://github.com/microsoft/vscode/issues/303012) |
+| Gemini CLI | Supported (refreshes the tool registry) | [PR #14375](https://github.com/google-gemini/gemini-cli/pull/14375), [PR #21050](https://github.com/google-gemini/gemini-cli/pull/21050) |
+| Cursor | Unreliable: staff confirm a regression in 3.12.x; restart Cursor after enabling | [forum](https://forum.cursor.com/t/mcp-server-regression-does-not-reload-tools-disconnect-does-nothing-ignores-mcp-json-changes-etc/166216) |
+| Claude Desktop, Windsurf, Codex CLI, Cline, Zed, Continue | Unverified: no official statement found; use `eager` or reconnect after enabling | — |
 
 ## Maintained and up to date
 
@@ -155,10 +170,18 @@ and open the other files on demand. Clients without skills get the same flows as
 | `topvisor-rank-check-safe` | Paid rank check with balance, quote, explicit approval, one launch, polling. |
 | `topvisor-competitor-tracking` | AI-tracker competitor visibility and keywords lost from TOP-10. |
 | `seo-weekly-client-report` | Agency client report: Topvisor + optional yandex-mcp, roistat-mcp, keysso-mcp. |
+| `topvisor-semantic-core` | Semantics -> clusters -> positions in one project: priced collection and frequencies, dedupe, cluster groups, rank check. |
 
 ## Toolsets and read-only mode
 
-`TOPVISOR_TOOLSETS=all` (default) or a comma list (see `topvisor://toolsets`); `TOPVISOR_TOOLS=a,b` adds single tools,
+Default: `meta`, `positions`, `ai_tracker`, `checks`, `setup_write`. Opt-in: `semantics`
+(`topvisor_semantics_tools`, `topvisor_semantics_price`, `topvisor_semantics_launch`: keyword collection,
+frequency checks, relevance checks, indexing requests, dedupe, clustering progress), `analytics`
+(`topvisor_report`: positions summary/chart, TOP snapshots, competitors, tasks, audit/indexing/watcher, apometr,
+bank history) and `competitors_write` (`topvisor_competitors_write`). Paid `topvisor_semantics_launch` calls and competitor writes return an
+`approval_id`; the operator accepts it outside MCP with `topvisor-approval --approval-id ID --digest D --accept`
+(single use, request- and caller-bound, 30 min), then the agent repeats the call with `approval_id`. Paid semantics launches count against `TOPVISOR_CHECK_DAILY_BUDGET` together with paid rank checks. Paid rank checks (`topvisor_check_launch`) keep the existing quote → `approved_cost` + `confirm_cost=true` gate without an `approval_id`.
+`TOPVISOR_TOOLSETS=default`, `all` or a comma list (see `topvisor://toolsets`); `TOPVISOR_TOOLS=a,b` adds single tools,
 `TOPVISOR_DISABLED_TOOLS=a,b` removes them, `TOPVISOR_READ_ONLY=1` removes every write/paid tool.
 
 ## Example requests
