@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import shlex
 from pathlib import Path
 
 import pytest
@@ -19,13 +21,29 @@ from zai_topvisor.semantics import (
 from zai_topvisor.server import create_server
 
 
+def split_command(command: str) -> list[str]:
+    """Split a command line the way the platform's shell hands it to the program."""
+    if os.name != "nt":
+        return shlex.split(command)
+    import ctypes
+    from ctypes import wintypes
+
+    parse = ctypes.windll.shell32.CommandLineToArgvW
+    parse.argtypes = [wintypes.LPCWSTR, ctypes.POINTER(ctypes.c_int)]
+    parse.restype = ctypes.POINTER(wintypes.LPWSTR)
+    count = ctypes.c_int()
+    argv = parse(command, ctypes.byref(count))
+    try:
+        return [argv[i] for i in range(count.value)]
+    finally:
+        ctypes.windll.kernel32.LocalFree(argv)
+
+
 def operator_accepts(ticket: dict) -> None:
     """Run the returned operator_command exactly as the operator would (no cwd/env assumptions)."""
-    import shlex
-
     from zai_topvisor.approvals import main
 
-    argv = shlex.split(ticket["operator_command"])
+    argv = split_command(ticket["operator_command"])
     assert argv[0] == "topvisor-approval"
     assert main(argv[1:]) == 0
 
