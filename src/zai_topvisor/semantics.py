@@ -4,8 +4,9 @@ Toolset `semantics`: free deduplication and clustering progress, priced keyword 
 (keywords_2/collect), frequency checks (keywords_2/volumes), relevance checks and indexing
 requests (projects_2/tasks). Paid launches reuse the operator gate of paid rank checks:
 TOPVISOR_WRITE_ENABLED, the project in TOPVISOR_CHECK_PROJECTS, the estimate within
-TOPVISOR_CHECK_MAX_COST, an explicit approved_cost equal to a fresh price, confirm_cost=true and an
-operator-accepted approval_id (topvisor-approval).
+TOPVISOR_CHECK_MAX_COST and the daily TOPVISOR_CHECK_DAILY_BUDGET (shared with rank checks), an
+explicit approved_cost equal to a fresh price, confirm_cost=true and an operator-accepted
+approval_id (topvisor-approval).
 Toolset `competitors_write`: approval-gated competitor add/del/import/edit.
 Toolset `analytics`: read-only summaries (positions summary and chart, TOP snapshots, project
 competitors, tasks, audit/indexing/watcher summaries, search-engine updates, bank history).
@@ -349,7 +350,7 @@ def approvals(runtime: Any) -> ApprovalStore:
 
 
 def approval_ticket(runtime: Any, tool: str, request_body: dict[str, Any], summary: str) -> dict[str, Any]:
-    ticket = approvals(runtime).prepare(tool, request_body, summary)
+    ticket = approvals(runtime).prepare(tool, request_body, summary, runtime.state.get().actor)
     return {
         "needs_operator_approval": True,
         **ticket,
@@ -489,7 +490,12 @@ def register_semantics(server: Any, runtime: Any) -> None:
         """
         config = runtime.config
         approved = units(approved_cost)
-        if not confirm_cost or not config.write_enabled or units(config.check_max_cost) <= 0:
+        if (
+            not confirm_cost
+            or not config.write_enabled
+            or units(config.check_max_cost) <= 0
+            or units(config.check_daily_budget) <= 0
+        ):
             raise PermissionError("explicit cost confirmation and operator check limits required")
         if project_id not in config.check_projects:
             raise PermissionError("project not enabled for paid Topvisor tasks")
@@ -516,16 +522,26 @@ def register_semantics(server: Any, runtime: Any) -> None:
             return approval_ticket(
                 runtime, "topvisor_semantics_launch", ticket_request, f"{kind} {amount(cost)}"
             )
-        approvals(runtime).consume(approval_id, "topvisor_semantics_launch", ticket_request)
+        approvals(runtime).consume(
+            approval_id, "topvisor_semantics_launch", ticket_request, runtime.state.get().actor
+        )
+        # Committed before the possibly dispatched request: an unknown outcome stays counted
+        # against TOPVISOR_CHECK_DAILY_BUDGET (shared with paid rank checks).
+        task_id = runtime.checks.claim_task(
+            runtime.state.get().actor, project_id, kind, cost, units(config.check_daily_budget)
+        )
         response = await request(runtime, PAID[kind][1], launch_payload, read=False)
-        return {
+        answer = {
             "kind": kind,
+            "task_id": task_id,
             "submitted": True,
             "completed": False,
             "estimated_cost": amount(cost),
             "result": response.get("result"),
             "next": "poll topvisor_report(report='tasks'), then topvisor_list_keywords",
         }
+        runtime.checks.task_accepted(task_id, answer)
+        return answer
 
     @server.tool(
         auth=runtime.require_scopes("topvisor:read", "topvisor:write"),
@@ -570,6 +586,8 @@ def register_semantics(server: Any, runtime: Any) -> None:
         ticket_request = {"endpoint": endpoint, "payload": payload}
         if not approval_id:
             return approval_ticket(runtime, "topvisor_competitors_write", ticket_request, endpoint)
-        approvals(runtime).consume(approval_id, "topvisor_competitors_write", ticket_request)
+        approvals(runtime).consume(
+            approval_id, "topvisor_competitors_write", ticket_request, runtime.state.get().actor
+        )
         response = await request(runtime, endpoint, payload, read=False)
         return {"action": action, "applied": True, "result": response.get("result")}

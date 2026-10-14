@@ -13,6 +13,8 @@ import json
 import os
 import tempfile
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -28,6 +30,30 @@ def request_digest(tool: str, request: dict[str, Any]) -> str:
 class ApprovalStore:
     def __init__(self, path: Path) -> None:
         self.path = Path(path)
+
+    @contextmanager
+    def _locked(self) -> Iterator[None]:
+        """Serialise load-modify-save across processes so a stale write cannot revive an approval."""
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.path.with_name(self.path.name + ".lock"), "a+b") as handle:
+            if os.name == "nt":  # pragma: no cover - exercised on Windows only
+                import msvcrt
+
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+                try:
+                    yield
+                finally:
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle, fcntl.LOCK_EX)
+                try:
+                    yield
+                finally:
+                    fcntl.flock(handle, fcntl.LOCK_UN)
 
     def _load(self) -> dict[str, dict[str, Any]]:
         try:
@@ -46,39 +72,49 @@ class ApprovalStore:
             os.chmod(tmp, 0o600)
         os.replace(tmp, self.path)
 
-    def prepare(self, tool: str, request: dict[str, Any], summary: str) -> dict[str, Any]:
-        data = self._load()
+    def prepare(
+        self, tool: str, request: dict[str, Any], summary: str, actor: str | None = None
+    ) -> dict[str, Any]:
         approval_id = uuid4().hex
         digest = request_digest(tool, request)
-        data[approval_id] = {
-            "tool": tool,
-            "digest": digest,
-            "summary": summary[:500],
-            "accepted": False,
-            "expires": time.time() + TTL_SECONDS,
-        }
-        self._save(data)
+        with self._locked():
+            data = self._load()
+            data[approval_id] = {
+                "tool": tool,
+                "digest": digest,
+                "summary": summary[:500],
+                "actor": actor,
+                "accepted": False,
+                "expires": time.time() + TTL_SECONDS,
+            }
+            self._save(data)
         return {"approval_id": approval_id, "digest": digest, "expires_in_s": TTL_SECONDS}
 
     def accept(self, approval_id: str, digest: str) -> dict[str, Any]:
-        data = self._load()
-        record = data.get(approval_id)
-        if record is None or record["digest"] != digest:
-            raise ValueError("approval not found, expired or digest mismatch")
-        record["accepted"] = True
-        self._save(data)
+        with self._locked():
+            data = self._load()
+            record = data.get(approval_id)
+            if record is None or record["digest"] != digest:
+                raise ValueError("approval not found, expired or digest mismatch")
+            record["accepted"] = True
+            self._save(data)
         return {"approval_id": approval_id, "tool": record["tool"], "summary": record["summary"]}
 
-    def consume(self, approval_id: str, tool: str, request: dict[str, Any]) -> None:
-        """Single-use check: accepted, same tool and identical request, not expired."""
-        data = self._load()
-        record = data.get(str(approval_id))
-        if record is None or not record.get("accepted"):
-            raise PermissionError("approval is not accepted by the operator (or expired)")
-        if record["tool"] != tool or record["digest"] != request_digest(tool, request):
-            raise PermissionError("approval does not match this exact request")
-        del data[str(approval_id)]
-        self._save(data)
+    def consume(self, approval_id: str, tool: str, request: dict[str, Any], actor: str | None = None) -> None:
+        """Single-use check: accepted, same tool, actor and identical request, not expired."""
+        with self._locked():
+            data = self._load()
+            record = data.get(str(approval_id))
+            if record is None or not record.get("accepted"):
+                raise PermissionError("approval is not accepted by the operator (or expired)")
+            if (
+                record["tool"] != tool
+                or record["digest"] != request_digest(tool, request)
+                or record.get("actor") != actor
+            ):
+                raise PermissionError("approval does not match this exact request")
+            del data[str(approval_id)]
+            self._save(data)
 
     def pending(self) -> list[dict[str, Any]]:
         return [{"approval_id": k, **v} for k, v in self._load().items() if not v.get("accepted")]

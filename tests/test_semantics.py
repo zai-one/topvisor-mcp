@@ -184,3 +184,99 @@ async def test_paid_launch_needs_matching_price_and_operator_approval(tmp_path: 
             )
         ).data
     assert done["submitted"] and sent[-1] == "add/projects_2/tasks/relevants"
+
+
+async def test_paid_launches_share_the_daily_budget(tmp_path: Path, monkeypatch) -> None:
+    """Regression: semantics launches used to bypass TOPVISOR_CHECK_DAILY_BUDGET entirely."""
+    from dataclasses import replace
+
+    from zai_topvisor import semantics
+    from zai_topvisor.approvals import ApprovalStore
+
+    sent = []
+
+    async def fake_request(runtime, endpoint, payload, *, read=True):
+        sent.append(endpoint)
+        return {"result": "2"} if endpoint.endswith("/price") else {"result": {"id": 9}}
+
+    monkeypatch.setattr(semantics, "request", fake_request)
+    monkeypatch.setenv("TOPVISOR_TOOLSETS", "all")
+    config = replace(
+        settings(tmp_path),
+        write_enabled=True,
+        check_projects=frozenset({7}),
+        check_max_cost="2",
+        check_daily_budget="3",
+    )
+    args = {"kind": "volumes", "project_id": 7, "approved_cost": "2", "confirm_cost": True}
+    store = ApprovalStore(tmp_path / "topvisor-approvals.json")
+    async with Client(create_server(config, transport="stdio")) as client:
+
+        async def approved_launch():
+            ticket = (await client.call_tool("topvisor_semantics_launch", args)).data
+            store.accept(ticket["approval_id"], ticket["digest"])
+            return await client.call_tool(
+                "topvisor_semantics_launch", {**args, "approval_id": ticket["approval_id"]}
+            )
+
+        first = (await approved_launch()).data
+        assert first["submitted"] and len(first["task_id"]) == 32
+        with pytest.raises(ToolError, match="provider_disabled"):  # daily budget exhausted
+            await approved_launch()
+    assert sent.count("edit/keywords_2/volumes/go") == 1
+
+
+def test_approval_is_bound_to_the_preparing_actor(tmp_path: Path) -> None:
+    from zai_topvisor.approvals import ApprovalStore
+
+    store = ApprovalStore(tmp_path / "a.json")
+    ticket = store.prepare("tool", {"x": 1}, "s", actor="alice")
+    store.accept(ticket["approval_id"], ticket["digest"])
+    with pytest.raises(PermissionError):
+        store.consume(ticket["approval_id"], "tool", {"x": 1}, actor="mallory")
+    store.consume(ticket["approval_id"], "tool", {"x": 1}, actor="alice")
+    with pytest.raises(PermissionError):
+        store.consume(ticket["approval_id"], "tool", {"x": 1}, actor="alice")
+
+
+def test_concurrent_prepare_cannot_revive_a_consumed_approval(tmp_path: Path, monkeypatch) -> None:
+    """Regression: an unlocked load-modify-save let a stale prepare() write back a consumed approval."""
+    import threading
+    import time
+
+    from zai_topvisor.approvals import ApprovalStore
+
+    store = ApprovalStore(tmp_path / "a.json")
+    ticket = store.prepare("tool", {"x": 1}, "s", actor="me")
+    store.accept(ticket["approval_id"], ticket["digest"])
+    loaded, release = threading.Event(), threading.Event()
+    original = ApprovalStore._load
+
+    def slow_load(self):
+        data = original(self)
+        if threading.current_thread().name == "preparer":
+            loaded.set()
+            release.wait(5)
+        return data
+
+    monkeypatch.setattr(ApprovalStore, "_load", slow_load)
+    errors: list[Exception] = []
+
+    def consume() -> None:
+        try:
+            store.consume(ticket["approval_id"], "tool", {"x": 1}, actor="me")
+        except Exception as exc:  # pragma: no cover - surfaced by the assertion below
+            errors.append(exc)
+
+    preparer = threading.Thread(target=lambda: store.prepare("tool", {"y": 2}, "s"), name="preparer")
+    preparer.start()
+    assert loaded.wait(5)
+    consumer = threading.Thread(target=consume)
+    consumer.start()
+    time.sleep(0.2)
+    release.set()
+    preparer.join(5)
+    consumer.join(5)
+    assert errors == []
+    with pytest.raises(PermissionError):
+        store.consume(ticket["approval_id"], "tool", {"x": 1}, actor="me")

@@ -180,7 +180,7 @@ frequency checks, relevance checks, indexing requests, dedupe, clustering progre
 (`topvisor_report`: positions summary/chart, TOP snapshots, competitors, tasks, audit/indexing/watcher, apometr,
 bank history) and `competitors_write` (`topvisor_competitors_write`). Paid `topvisor_semantics_launch` calls and competitor writes return an
 `approval_id`; the operator accepts it outside MCP with `topvisor-approval --approval-id ID --digest D --accept`
-(single use, request-bound, 30 min), then the agent repeats the call with `approval_id`. Paid rank checks (`topvisor_check_launch`) keep the existing quote → `approved_cost` + `confirm_cost=true` gate without an `approval_id`.
+(single use, request- and caller-bound, 30 min), then the agent repeats the call with `approval_id`. Paid semantics launches count against `TOPVISOR_CHECK_DAILY_BUDGET` together with paid rank checks. Paid rank checks (`topvisor_check_launch`) keep the existing quote → `approved_cost` + `confirm_cost=true` gate without an `approval_id`.
 `TOPVISOR_TOOLSETS=default`, `all` or a comma list (see `topvisor://toolsets`); `TOPVISOR_TOOLS=a,b` adds single tools,
 `TOPVISOR_DISABLED_TOOLS=a,b` removes them, `TOPVISOR_READ_ONLY=1` removes every write/paid tool.
 

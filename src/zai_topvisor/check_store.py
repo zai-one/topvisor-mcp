@@ -18,6 +18,12 @@ class CheckStore:
                 project INTEGER NOT NULL, payload TEXT NOT NULL, cost INTEGER NOT NULL,
                 created REAL NOT NULL, expires REAL NOT NULL, state TEXT NOT NULL,
                 reserved INTEGER NOT NULL DEFAULT 0, dispatched REAL, result TEXT)""")
+            # Other paid launches (semantics: collect, volumes, relevants, indexing) share the
+            # operator's daily estimate budget with rank checks.
+            db.execute("""CREATE TABLE IF NOT EXISTS paid_tasks(
+                id TEXT PRIMARY KEY, account TEXT NOT NULL, actor TEXT NOT NULL,
+                project INTEGER NOT NULL, kind TEXT NOT NULL, cost INTEGER NOT NULL,
+                dispatched REAL NOT NULL, state TEXT NOT NULL, reserved INTEGER NOT NULL, result TEXT)""")
 
     def create(self, actor, project, payload, cost):
         identifier, now = uuid4().hex, time.time()
@@ -62,15 +68,46 @@ class CheckStore:
                 (self.policy.account, row[0]),
             ).fetchone():
                 raise ProviderError("this project has a check awaiting operator reconciliation")
-            total = db.execute(
-                "SELECT COALESCE(SUM(reserved),0) FROM rank_checks WHERE account=? AND dispatched>=?",
-                (self.policy.account, day),
-            ).fetchone()[0]
-            if total + row[1] > daily_budget:
+            if self._spent(db, day) + row[1] > daily_budget:
                 raise PermissionError("daily ranking-check estimate budget exhausted")
             db.execute(
                 "UPDATE rank_checks SET state='dispatching',reserved=cost,dispatched=? WHERE id=?",
                 (now, identifier),
+            )
+
+    def _spent(self, db, day):
+        return sum(
+            db.execute(
+                f"SELECT COALESCE(SUM(reserved),0) FROM {table} WHERE account=? AND dispatched>=?",
+                (self.policy.account, day),
+            ).fetchone()[0]
+            for table in ("rank_checks", "paid_tasks")
+        )
+
+    def claim_task(self, actor, project, kind, cost, daily_budget):
+        """Reserve a paid task's estimate against the shared daily budget before dispatch.
+
+        The reservation stays counted even if the dispatch outcome is unknown.
+        """
+        identifier = uuid4().hex
+        with self.policy.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            now = time.time()
+            day = int(now // 86400) * 86400
+            if self._spent(db, day) + cost > daily_budget:
+                raise PermissionError("daily paid-task estimate budget exhausted")
+            db.execute(
+                "INSERT INTO paid_tasks(id,account,actor,project,kind,cost,dispatched,state,reserved) "
+                "VALUES(?,?,?,?,?,?,?,'dispatching',?)",
+                (identifier, self.policy.account, actor, project, kind, cost, now, cost),
+            )
+        return identifier
+
+    def task_accepted(self, identifier, result):
+        with self.policy.connect() as db:
+            db.execute(
+                "UPDATE paid_tasks SET state='accepted',result=? WHERE id=? AND account=?",
+                (json.dumps(result), identifier, self.policy.account),
             )
 
     def accepted(self, actor, identifier, result):
