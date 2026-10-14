@@ -174,4 +174,5 @@ PROFILE = Profile(
     prompts=PROMPTS,
     routes=ROUTES,
     optin=OPTIN,
+    lazy_core=("topvisor_list_projects", "topvisor_positions_history"),
 )

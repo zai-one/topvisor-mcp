@@ -2,6 +2,7 @@
 
 ## Unreleased — Semantics and analytics coverage, router eval
 
+- Optional lazy tool loading (`TOPVISOR_TOOL_LOADING=eager|lazy`, default `eager` = unchanged): lazy lists a small core plus `topvisor_enable_toolsets` (toolsets with one-line description and token cost); enabling registers the tools at runtime and sends `notifications/tools/list_changed`. Allowlists, read-only mode and approval gates still apply. Setup wizard asks eager vs lazy. Startup tokens (tools/list + instructions, ≈chars/4): eager ≈5561, lazy ≈1192.
 - Paid tasks `relevants` and `indexing` (projects_2/tasks) in `topvisor_semantics_price` / `_launch`; every paid `topvisor_semantics_launch` now also needs an operator-accepted, request-bound approval (`topvisor-approval`).
 - `topvisor_competitors_write` (opt-in toolset `competitors_write`): add/del/import, edit name/brand/on/move, approval-gated.
 - Snapshots no longer send or require `region_index` (not in the OpenAPI for snapshots_2); positions summaries still require it.
