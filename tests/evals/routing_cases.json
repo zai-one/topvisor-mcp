@@ -1,18 +1,102 @@
 [
-  {"request": "как изменились позиции за неделю по проекту?", "route": "weekly", "tool": "topvisor_rank_changes"},
-  {"request": "weekly rankings for our main project please", "route": "weekly", "tool": "topvisor_positions_history"},
-  {"request": "сделай отчёт клиенту по SEO за прошлую неделю", "route": "client", "tool": "topvisor_rank_changes"},
-  {"request": "prepare a client report with movers", "route": "client", "tool": "topvisor_rank_changes"},
-  {"request": "запусти съём позиций прямо сейчас", "route": "check", "tool": "topvisor_check_launch"},
-  {"request": "do a fresh check of positions, how much will it cost?", "route": "check", "tool": "topvisor_check_quote"},
-  {"request": "как мы выглядим против конкурентов по видимости", "route": "competitors", "tool": "topvisor_positions_history"},
-  {"request": "show competitors summary for the project", "route": "competitors", "tool": "topvisor_report"},
-  {"request": "собери семантику и частотность по нашей теме", "route": "semantics", "tool": "topvisor_semantics_launch"},
-  {"request": "нужно ядро и кластеры для нового раздела", "route": "semantics", "tool": "topvisor_semantics_tools"},
-  {"request": "создать проект в топвизоре для нового клиента", "route": "setup", "tool": "topvisor_create_project"},
-  {"request": "add these phrases and a Moscow region to the setup", "route": "setup", "tool": "topvisor_import_keywords"},
-  {"request": "как часто нас упоминает ChatGPT — глянь AI tracker", "route": "ai", "tool": "topvisor_ai_tracker_summary"},
-  {"request": "what do the нейросети say about our brand", "route": "ai", "tool": "topvisor_ai_tracker_history"},
-  {"request": "какой баланс на аккаунте?", "route": "errors", "tool": "topvisor_balance"},
-  {"request": "got an error from topvisor, what does it mean", "route": "errors", "tool": "topvisor_balance"}
+  {
+    "request": "как изменились позиции за неделю по проекту?",
+    "route": "weekly",
+    "tool": "topvisor_rank_changes"
+  },
+  {
+    "request": "weekly rankings for our main project please",
+    "route": "weekly",
+    "tool": "topvisor_positions_history"
+  },
+  {
+    "request": "сделай отчёт клиенту по SEO за прошлую неделю",
+    "route": "client",
+    "tool": "topvisor_rank_changes"
+  },
+  {
+    "request": "prepare a client report with movers",
+    "route": "client",
+    "tool": "topvisor_rank_changes"
+  },
+  {
+    "request": "запусти съём позиций прямо сейчас",
+    "route": "check",
+    "tool": "topvisor_check_launch"
+  },
+  {
+    "request": "do a fresh check of positions, how much will it cost?",
+    "route": "check",
+    "tool": "topvisor_check_quote"
+  },
+  {
+    "request": "как мы выглядим против конкурентов по видимости",
+    "route": "competitors",
+    "tool": "topvisor_positions_history"
+  },
+  {
+    "request": "show competitors summary for the project",
+    "route": "competitors",
+    "tool": "topvisor_report"
+  },
+  {
+    "request": "собери семантику и частотность по нашей теме",
+    "route": "semantics",
+    "tool": "topvisor_semantics_launch"
+  },
+  {
+    "request": "нужно ядро и кластеры для нового раздела",
+    "route": "semantics",
+    "tool": "topvisor_semantics_tools"
+  },
+  {
+    "request": "создать проект в топвизоре для нового клиента",
+    "route": "setup",
+    "tool": "topvisor_create_project"
+  },
+  {
+    "request": "add these phrases and a Moscow region to the setup",
+    "route": "setup",
+    "tool": "topvisor_import_keywords"
+  },
+  {
+    "request": "как часто нас упоминает ChatGPT — глянь AI tracker",
+    "route": "ai",
+    "tool": "topvisor_ai_tracker_summary"
+  },
+  {
+    "request": "what do the нейросети say about our brand",
+    "route": "ai",
+    "tool": "topvisor_ai_tracker_history"
+  },
+  {
+    "request": "какой баланс на аккаунте?",
+    "route": "errors",
+    "tool": "topvisor_balance"
+  },
+  {
+    "request": "got an error from topvisor, what does it mean",
+    "route": "errors",
+    "tool": "topvisor_balance"
+  },
+  {
+    "request": "какая погода завтра в Москве",
+    "route": null,
+    "tool": ""
+  },
+  {
+    "request": "translate this paragraph into German",
+    "route": null,
+    "tool": ""
+  },
+  {
+    "request": "напиши стихотворение про осень",
+    "route": null,
+    "tool": ""
+  },
+  {
+    "request": "book a table at the restaurant tonight",
+    "route": null,
+    "tool": ""
+  }
 ]
