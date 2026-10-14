@@ -2,6 +2,8 @@
 
 ## Unreleased — Semantics and analytics coverage, router eval
 
+- Review fixes (topvisor-openapi): `search_updates` sends required `region_index` + `date`; summary/chart/snapshot reports require `date1`+`date2`; keyword collection into a group sends `in_one_group=true` with `to_group_id`.
+
 - API re-check against topvisor-openapi (2026-10): positions summary/chart, snapshots, project competitors, tasks, audit/indexing/watcher summaries, apometr updates, bank history, keyword collection, frequency checks, deduplication and clustering progress were missing.
 - New opt-in toolset `analytics` (off by default; default tools and token budget unchanged): `topvisor_report` over a fixed read allowlist.
 - New opt-in toolset `semantics`: `topvisor_semantics_tools` (free deduplicate, cluster_progress), `topvisor_semantics_price` (collect / volumes price) and `topvisor_semantics_launch` (paid; same operator gate as paid rank checks: write enabled, project allowlisted, cost ≤ TOPVISOR_CHECK_MAX_COST, `approved_cost` equals a fresh price, `confirm_cost=true`).

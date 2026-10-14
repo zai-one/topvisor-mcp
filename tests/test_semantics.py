@@ -48,3 +48,20 @@ async def test_optin_tools_and_launch_gate(tmp_path: Path, monkeypatch) -> None:
                 "topvisor_semantics_launch",
                 {"kind": "volumes", "project_id": 7, "approved_cost": "1", "confirm_cost": True},
             )
+
+
+def test_payloads_follow_openapi_required_fields():
+    # get/content_2/apometr/updates: region_index + date required, no paging.
+    endpoint, payload = report_payload("search_updates", None, region_index=1, date1="2026-10-01")
+    assert endpoint == "get/content_2/apometr/updates"
+    assert payload == {"region_index": 1, "date": "2026-10-01"}
+    with pytest.raises(ValueError):
+        report_payload("search_updates", None)
+    # date1/date2 (or dates) are mandatory for summary and snapshot selectors.
+    with pytest.raises(ValueError):
+        report_payload("positions_summary", 7, region_index=0)
+    with pytest.raises(ValueError):
+        report_payload("snapshots_history", 7, region_index=0, date1="2026-10-01")
+    # keywords_2/collect: to_group_id only with in_one_group=true.
+    collect = paid_payload("collect", 7, keywords=["диван"], group_id=5)
+    assert collect["in_one_group"] is True and collect["to_group_id"] == 5

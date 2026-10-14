@@ -84,6 +84,9 @@ def phrases(value: object, maximum: int = 1000) -> list[str]:
     return list(dict.fromkeys(clean))
 
 
+_DATED = frozenset({"positions_summary", "summary_chart", "snapshots_history", "snapshots_competitors"})
+
+
 def report_payload(
     report: str,
     project_id: int | None,
@@ -109,6 +112,17 @@ def report_payload(
         payload["region_index"] = region_index
         if report == "positions_summary":
             payload.update(show_dynamics=True, show_tops=True, show_avg=True, show_visibility=True)
+    if report == "search_updates":
+        # openapi get/content_2/apometr/updates: required region_index + date; no paging.
+        if type(region_index) is not int or region_index < 0:
+            raise ValueError("search_updates requires region_index (apometr region)")
+        if date1 is None:
+            raise ValueError("search_updates requires date1 (the day to read)")
+        payload = {"region_index": region_index, "date": _day(date1, "date1")}
+        return READS[report], payload
+    if report in _DATED and (date1 is None or date2 is None):
+        # openapi: date1+date2+type_range or dates are mandatory for these selectors.
+        raise ValueError(f"{report} requires date1 and date2 (YYYY-MM-DD)")
     if date1 is not None or date2 is not None:
         payload["date1"], payload["date2"] = _day(date1, "date1"), _day(date2, "date2")
         if payload["date1"] > payload["date2"]:
@@ -116,7 +130,7 @@ def report_payload(
         payload["type_range"] = 0
     if competitor_id is not None:
         payload["competitor_id"] = _id(competitor_id, "competitor_id")
-    if report in {"competitors", "tasks", "bank_history", "search_updates", "snapshots_competitors"}:
+    if report in {"competitors", "tasks", "bank_history", "snapshots_competitors"}:
         payload.update(limit=limit, offset=offset)
     if report == "tasks" and "project_id" in payload:
         payload["filters"] = [
@@ -174,6 +188,8 @@ def paid_payload(
     if minus_keywords:
         payload["keywords_minus"] = phrases(minus_keywords, 500)
     if group_id is not None:
+        # openapi: to_group_id is accepted only together with in_one_group=true.
+        payload["in_one_group"] = True
         payload["to_group_id"] = _id(group_id, "group_id")
     return payload
 
@@ -238,7 +254,8 @@ def register_semantics(server: Any, runtime: Any) -> None:
         """Read Topvisor summaries: positions summary/chart (tops, avg, visibility), snapshots, competitors.
 
         Also tasks, site audit / indexing / watcher summaries, search-engine updates (apometr) and bank
-        history. Free; never starts checks. region_index from topvisor_get_project_setup.
+        history. Free; never starts checks. region_index from topvisor_get_project_setup; summaries and
+        snapshots need date1+date2; search_updates needs region_index + date1.
         """
         endpoint, payload = report_payload(
             report, project_id, region_index, date1, date2, competitor_id, limit, offset

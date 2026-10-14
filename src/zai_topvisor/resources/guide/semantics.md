@@ -16,4 +16,4 @@ Opt-in toolsets: `TOPVISOR_TOOLSETS=default,semantics,analytics` (or `all`).
 Paid launches need the operator gate: `TOPVISOR_WRITE_ENABLED=true`, the project in
 `TOPVISOR_CHECK_PROJECTS`, cost ≤ `TOPVISOR_CHECK_MAX_COST`, and `approved_cost` equal to a fresh price.
 Other `topvisor_report` values: summary_chart, snapshots_history, snapshots_competitors, competitors,
-audit_summary, indexing_summary, watcher_summary, search_updates (apometr), bank_history.
+audit_summary, indexing_summary, watcher_summary, search_updates (apometr: region_index + date1), bank_history. Summary, chart and snapshot reports need date1 and date2.
