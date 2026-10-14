@@ -29,7 +29,7 @@ Try asking your assistant:
 
 ## Why this MCP
 
-- Optional lazy tool loading: `TOPVISOR_TOOL_LOADING=lazy` starts with a small core plus `topvisor_enable_toolsets` and adds toolsets on demand (`tools/list_changed`). Startup cost (tools/list + instructions, ≈chars/4): eager ≈5561 tokens, lazy ≈1192 tokens (−79%). Default `eager` is unchanged; if your client ignores `tools/list_changed`, keep `eager` or reconnect after enabling.
+- Optional lazy tool loading: `TOPVISOR_TOOL_LOADING=lazy` starts with a small core plus `topvisor_enable_toolsets` and adds toolsets on demand (`tools/list_changed`). Startup cost (tools/list + instructions, ≈chars/4): eager ≈5561 tokens, lazy ≈1196 tokens (−78%). Default `eager` is unchanged; if your client ignores `tools/list_changed`, keep `eager` or reconnect after enabling. Scope: enablement is per MCP session (FastMCP session visibility), so one client's enabled toolsets never appear for another. The HTTP transport here is stateless (every request is its own session), so enabled toolsets do not persist there: for shared HTTP use `eager` or `TOPVISOR_TOOLSETS`.
 - Reads use saved data and are free; a paid check needs `topvisor_balance` → `topvisor_check_quote` → confirmation, within operator-set project and cost limits.
 - Toolsets (meta, positions, ai_tracker, checks, setup_write) and read-only mode; writes are previewed before they are applied.
 - Ranking comparisons and exports keep missing values distinct from ranks (JSON/CSV).
