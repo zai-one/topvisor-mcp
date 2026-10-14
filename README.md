@@ -161,8 +161,11 @@ and open the other files on demand. Clients without skills get the same flows as
 
 Default: `meta`, `positions`, `ai_tracker`, `checks`, `setup_write`. Opt-in: `semantics`
 (`topvisor_semantics_tools`, `topvisor_semantics_price`, `topvisor_semantics_launch`: keyword collection,
-frequency checks, dedupe, clustering progress) and `analytics` (`topvisor_report`: positions summary/chart,
-TOP snapshots, competitors, tasks, audit/indexing/watcher, apometr, bank history).
+frequency checks, relevance checks, indexing requests, dedupe, clustering progress), `analytics`
+(`topvisor_report`: positions summary/chart, TOP snapshots, competitors, tasks, audit/indexing/watcher, apometr,
+bank history) and `competitors_write` (`topvisor_competitors_write`). Paid launches and competitor writes return an
+`approval_id`; the operator accepts it outside MCP with `topvisor-approval --approval-id ID --digest D --accept`
+(single use, request-bound, 30 min), then the agent repeats the call with `approval_id`.
 `TOPVISOR_TOOLSETS=default`, `all` or a comma list (see `topvisor://toolsets`); `TOPVISOR_TOOLS=a,b` adds single tools,
 `TOPVISOR_DISABLED_TOOLS=a,b` removes them, `TOPVISOR_READ_ONLY=1` removes every write/paid tool.
 

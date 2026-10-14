@@ -2,6 +2,10 @@
 
 ## Unreleased — Semantics and analytics coverage, router eval
 
+- Paid tasks `relevants` and `indexing` (projects_2/tasks) in `topvisor_semantics_price` / `_launch`; every paid launch now also needs an operator-accepted, request-bound approval (`topvisor-approval`).
+- `topvisor_competitors_write` (opt-in toolset `competitors_write`): add/del/import, edit name/brand/on/move, approval-gated.
+- Snapshots no longer send or require `region_index` (not in the OpenAPI for snapshots_2); positions summaries still require it.
+
 - Review fixes (topvisor-openapi): `search_updates` sends required `region_index` + `date`; summary/chart/snapshot reports require `date1`+`date2`; keyword collection into a group sends `in_one_group=true` with `to_group_id`.
 
 - API re-check against topvisor-openapi (2026-10): positions summary/chart, snapshots, project competitors, tasks, audit/indexing/watcher summaries, apometr updates, bank history, keyword collection, frequency checks, deduplication and clustering progress were missing.

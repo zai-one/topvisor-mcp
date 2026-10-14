@@ -87,10 +87,12 @@ DESCRIPTIONS = {
     "TOP snapshots, competitors, tasks, audit, apometr updates, bank history. Cost: free.",
     "topvisor_semantics_tools": "Deduplicate implicit duplicate phrases or read clustering progress. Use "
     "while cleaning a semantic core. Cost: free.",
-    "topvisor_semantics_price": "Price keyword collection (collect) or a frequency check (volumes). Use "
+    "topvisor_semantics_price": "Price collect, volumes, relevants (relevance) or indexing tasks. Use "
     "before `topvisor_semantics_launch`; show the cost. Cost: free.",
-    "topvisor_semantics_launch": "Launch a priced collect/volumes task once. Use only after the user "
-    "approved the exact cost. Cost: spends balance; operator paid limits apply.",
+    "topvisor_semantics_launch": "Launch a priced paid task once. Use only after the user approved the "
+    "exact cost and the operator accepted approval_id. Cost: spends balance.",
+    "topvisor_competitors_write": "Add, delete, import, rename, brand, enable or move project competitors. "
+    "Writes: operator approval_id; TOPVISOR_WRITE_ENABLED.",
     "topvisor_check_update": "Check for a newer server release; never installs. Cost: free, 24h cache.",
 }
 
@@ -131,8 +133,9 @@ TOOLSETS = {
         "topvisor_semantics_launch",
     ),
     "analytics": ("topvisor_report",),
+    "competitors_write": ("topvisor_competitors_write",),
 }
-OPTIN = ("semantics", "analytics")
+OPTIN = ("semantics", "analytics", "competitors_write")
 
 PROMPTS = (
     Prompt(
