@@ -179,8 +179,8 @@ Default: `meta`, `positions`, `ai_tracker`, `checks`, `setup_write`. Opt-in: `se
 frequency checks, relevance checks, indexing requests, dedupe, clustering progress), `analytics`
 (`topvisor_report`: positions summary/chart, TOP snapshots, competitors, tasks, audit/indexing/watcher, apometr,
 bank history) and `competitors_write` (`topvisor_competitors_write`). Paid `topvisor_semantics_launch` calls and competitor writes return an
-`approval_id`; the operator accepts it outside MCP with `topvisor-approval --approval-id ID --digest D --accept`
-(single use, request- and caller-bound, 30 min), then the agent repeats the call with `approval_id`. Paid semantics launches count against `TOPVISOR_CHECK_DAILY_BUDGET` together with paid rank checks. Paid rank checks (`topvisor_check_launch`) keep the existing quote → `approved_cost` + `confirm_cost=true` gate without an `approval_id`.
+`approval_id` and an `operator_command`; the operator accepts it outside MCP with `topvisor-approval --path STATE_DB --approval-id ID --digest D --accept`
+(or `--config` with the server's settings file; single use, bound to the account, Topvisor user, caller and exact request incl. project, 30 min, stored in the state database), then the agent repeats the call with `approval_id`. Paid semantics launches count against `TOPVISOR_CHECK_DAILY_BUDGET` together with paid rank checks; a launch with an unknown outcome blocks further paid tasks for the project until `topvisor-check-reconcile --check-id TASK_ID`, and a replay of the same approval returns the stored receipt. Competitor writes use the persistent idempotency ledger (an unconfirmed write stays pending, a repeat returns the stored result). Paid rank checks (`topvisor_check_launch`) keep the existing quote → `approved_cost` + `confirm_cost=true` gate without an `approval_id`.
 `TOPVISOR_TOOLSETS=default`, `all` or a comma list (see `topvisor://toolsets`); `TOPVISOR_TOOLS=a,b` adds single tools,
 `TOPVISOR_DISABLED_TOOLS=a,b` removes them, `TOPVISOR_READ_ONLY=1` removes every write/paid tool.
 

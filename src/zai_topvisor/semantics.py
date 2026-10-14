@@ -15,12 +15,16 @@ Clustering itself is started in the Topvisor UI: the public API exposes only its
 
 from __future__ import annotations
 
+import json
+import os
 import re
+import shlex
+import subprocess
 from datetime import date
 from typing import Any, Literal
 
 from zai_topvisor.adapter import MAX_ID
-from zai_topvisor.approvals import ApprovalStore
+from zai_topvisor.approvals import ApprovalStore, valid_id
 from zai_topvisor.rank_checks import amount, units
 from zai_topvisor.transport import ProviderError
 
@@ -346,7 +350,14 @@ async def request(
 
 
 def approvals(runtime: Any) -> ApprovalStore:
-    return ApprovalStore(runtime.config.state_path.with_name("topvisor-approvals.json"))
+    # Same SQLite state database as the idempotency ledger and paid-task reservations.
+    config = runtime.config
+    return ApprovalStore(config.state_path, config.account_id, config.user_id)
+
+
+def _quoted(path: Any) -> str:
+    text = str(path.absolute())
+    return subprocess.list2cmdline([text]) if os.name == "nt" else shlex.quote(text)
 
 
 def approval_ticket(runtime: Any, tool: str, request_body: dict[str, Any], summary: str) -> dict[str, Any]:
@@ -356,11 +367,17 @@ def approval_ticket(runtime: Any, tool: str, request_body: dict[str, Any], summa
         **ticket,
         "summary": summary,
         "request": request_body,
-        "operator_command": f"topvisor-approval --approval-id {ticket['approval_id']} "
-        f"--digest {ticket['digest']} --accept",
+        "operator_command": f"topvisor-approval --path {_quoted(runtime.config.state_path)} "
+        f"--approval-id {ticket['approval_id']} --digest {ticket['digest']} --accept",
         "hint": "Show the request; the operator (not the agent) runs operator_command, then repeat the "
         "same call with approval_id.",
     }
+
+
+def _approval_id(value: object) -> str:
+    if not valid_id(value):
+        raise PermissionError("approval is not accepted by the operator (or expired or used)")
+    return str(value)
 
 
 def register_semantics(server: Any, runtime: Any) -> None:
@@ -514,21 +531,45 @@ def register_semantics(server: Any, runtime: Any) -> None:
         }
         payload = paid_payload(kind, project_id, **options)
         launch_payload = paid_payload(kind, project_id, launch=True, **options)
+        tool = "topvisor_semantics_launch"
+        # project_id is part of the approved request: relevants/indexing payloads do not carry it.
+        ticket_request = {
+            "kind": kind,
+            "project_id": project_id,
+            "payload": launch_payload,
+            "approved_cost": amount(approved),
+        }
+        actor, store = runtime.state.get().actor, approvals(runtime)
+        if approval_id:
+            approval_id = _approval_id(approval_id)
+            prior = runtime.checks.task(actor, approval_id)
+            if prior is not None:
+                # The approval is the operation identity: never dispatch it twice.
+                if not store.consumed_for(approval_id, tool, ticket_request, actor):
+                    raise PermissionError("approval does not match this exact request")
+                if prior["state"] == "accepted":
+                    return {**json.loads(prior["result"]), "replayed": True}
+                raise ProviderError(
+                    "dispatch outcome of this approval is unknown or reconciled; "
+                    "operator reconciliation (topvisor-check-reconcile) required"
+                )
         cost = price_units(await request(runtime, PAID[kind][0], payload))
         if cost != approved or approved > units(config.check_max_cost):
             raise PermissionError("price changed or exceeds the operator limit; request a new price")
-        ticket_request = {"kind": kind, "payload": launch_payload, "approved_cost": amount(approved)}
         if not approval_id:
-            return approval_ticket(
-                runtime, "topvisor_semantics_launch", ticket_request, f"{kind} {amount(cost)}"
-            )
-        approvals(runtime).consume(
-            approval_id, "topvisor_semantics_launch", ticket_request, runtime.state.get().actor
-        )
-        # Committed before the possibly dispatched request: an unknown outcome stays counted
-        # against TOPVISOR_CHECK_DAILY_BUDGET (shared with paid rank checks).
+            return approval_ticket(runtime, tool, ticket_request, f"{kind} {amount(cost)}")
+        # Approval use, budget reservation and the project fence commit in one durable SQLite
+        # transaction before the possibly dispatched request. An unknown outcome stays counted
+        # against TOPVISOR_CHECK_DAILY_BUDGET (shared with paid rank checks) and blocks further paid
+        # tasks for the project until topvisor-check-reconcile.
         task_id = runtime.checks.claim_task(
-            runtime.state.get().actor, project_id, kind, cost, units(config.check_daily_budget)
+            actor,
+            project_id,
+            kind,
+            cost,
+            units(config.check_daily_budget),
+            operation_id=approval_id,
+            consume=lambda db: store.consume(approval_id, tool, ticket_request, actor, db),
         )
         response = await request(runtime, PAID[kind][1], launch_payload, read=False)
         answer = {
@@ -536,6 +577,7 @@ def register_semantics(server: Any, runtime: Any) -> None:
             "task_id": task_id,
             "submitted": True,
             "completed": False,
+            "replayed": False,
             "estimated_cost": amount(cost),
             "result": response.get("result"),
             "next": "poll topvisor_report(report='tasks'), then topvisor_list_keywords",
@@ -561,10 +603,12 @@ def register_semantics(server: Any, runtime: Any) -> None:
         to_type: Literal["before", "after"] | None = None,
         competitors: str | None = None,
         approval_id: str | None = None,
+        idempotency_key: str | None = None,
     ) -> dict[str, Any]:
         """Change project competitors: add urls, delete/enable ids, import CSV, rename, brand (AI answers
         name/aliases), move. Needs TOPVISOR_WRITE_ENABLED and an operator approval: the first call
-        returns approval_id; repeat with it once accepted.
+        returns approval_id; repeat with it once accepted. Identical repeats return the stored result
+        (pass a new idempotency_key to redo a completed change on purpose).
         """
         if not runtime.config.write_enabled:
             raise PermissionError("Topvisor writes are disabled by the operator")
@@ -583,11 +627,30 @@ def register_semantics(server: Any, runtime: Any) -> None:
             competitors=competitors,
         )
         endpoint = COMPETITOR_WRITES[action]
+        tool = "topvisor_competitors_write"
         ticket_request = {"endpoint": endpoint, "payload": payload}
         if not approval_id:
-            return approval_ticket(runtime, "topvisor_competitors_write", ticket_request, endpoint)
-        approvals(runtime).consume(
-            approval_id, "topvisor_competitors_write", ticket_request, runtime.state.get().actor
+            return approval_ticket(runtime, tool, ticket_request, endpoint)
+        approvals(runtime).consume(_approval_id(approval_id), tool, ticket_request, runtime.state.get().actor)
+
+        async def apply() -> Any:
+            return (await request(runtime, endpoint, payload, read=False)).get("result")
+
+        async def readback(_result: Any) -> Any:
+            listing = {"project_id": project_id, "limit": 100, "offset": 0}
+            return (await request(runtime, READS["competitors"], listing)).get("result")
+
+        # Durable idempotency ledger (as for other writes): the operation is reserved as pending
+        # before dispatch; an identical repeat returns the stored result, and an unconfirmed one
+        # stays pending (never resubmitted) until the operator reconciles it.
+        written = await runtime.write(
+            "topvisor",
+            tool,
+            ticket_request,
+            idempotency_key,
+            enabled=runtime.config.write_enabled,
+            validate=lambda: None,
+            apply_fn=apply,
+            readback_fn=readback,
         )
-        response = await request(runtime, endpoint, payload, read=False)
-        return {"action": action, "applied": True, "result": response.get("result")}
+        return {"action": action, **written}
