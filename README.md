@@ -51,7 +51,7 @@ Clients and `notifications/tools/list_changed` (verified against official docs, 
 
 ## Maintained and up to date
 
-- Actively maintained by ZAI.ONE: current version 0.5.0; release notes in [CHANGELOG.md](CHANGELOG.md) and [Releases](https://github.com/zai-one/topvisor-mcp/releases).
+- Actively maintained by ZAI.ONE: current version 0.6.0; release notes in [CHANGELOG.md](CHANGELOG.md) and [Releases](https://github.com/zai-one/topvisor-mcp/releases).
 - Built-in update check: ask the assistant to run `topvisor_check_update` (public GitHub API, no credentials, cached; nothing is installed automatically; `TOPVISOR_DISABLE_UPDATE_CHECK=1` turns it off).
 - Follows current MCP practice: tool annotations (read-only / destructive hints), toolsets and read-only mode, server `instructions`, prompts and resources, structured errors with recovery hints, secrets kept out of tool output, a token budget for tool descriptions enforced in tests.
 - CI runs the test suite on Linux and Windows for every pull request.
@@ -117,7 +117,7 @@ reproducible installs; placeholders below are examples, keep secrets in files ou
 **Claude Code**
 
 ```bash
-claude mcp add topvisor --env TOPVISOR_USER_ID=123456 --env TOPVISOR_API_KEY_FILE=/path/to/topvisor.token --env TOPVISOR_STATE_PATH=/path/to/topvisor.sqlite -- uvx --from git+https://github.com/zai-one/topvisor-mcp@v0.5.0 topvisor-mcp
+claude mcp add topvisor --env TOPVISOR_USER_ID=123456 --env TOPVISOR_API_KEY_FILE=/path/to/topvisor.token --env TOPVISOR_STATE_PATH=/path/to/topvisor.sqlite -- uvx --from git+https://github.com/zai-one/topvisor-mcp@v0.6.0 topvisor-mcp
 ```
 
 Skills for Claude Code: copy `skills/*` into `~/.claude/skills/` (or install this repo as a plugin — it
@@ -132,7 +132,7 @@ ships `.claude-plugin/plugin.json` with the skills and the MCP server).
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/zai-one/topvisor-mcp@v0.5.0",
+        "git+https://github.com/zai-one/topvisor-mcp@v0.6.0",
         "topvisor-mcp"
       ],
       "env": {
@@ -151,7 +151,7 @@ repo's `.agents/skills` link):
 ```toml
 [mcp_servers.topvisor]
 command = "uvx"
-args = ["--from", "git+https://github.com/zai-one/topvisor-mcp@v0.5.0", "topvisor-mcp"]
+args = ["--from", "git+https://github.com/zai-one/topvisor-mcp@v0.6.0", "topvisor-mcp"]
 env = { TOPVISOR_USER_ID = "123456", TOPVISOR_API_KEY_FILE = "/path/to/topvisor.token", TOPVISOR_STATE_PATH = "/path/to/topvisor.sqlite" }
 ```
 
