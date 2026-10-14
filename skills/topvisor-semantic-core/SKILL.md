@@ -15,7 +15,8 @@ Errors: [references/errors.md](references/errors.md).
 1. Resolve `project_id` and `region_index`: `topvisor_list_projects` -> `topvisor_get_project_setup`.
    Ask for seeds (≤100), searcher and region (213 Москва).
 2. `topvisor_balance`. Collect: `topvisor_semantics_price(kind="collect", ...)` -> show cost -> explicit OK ->
-   `topvisor_semantics_launch(..., approved_cost=<that cost>, confirm_cost=true)`.
+   `topvisor_semantics_launch(..., approved_cost=<that cost>, confirm_cost=true)` -> operator accepts the
+   returned `approval_id` (never run it yourself) -> repeat the same call with `approval_id`.
    Poll `topvisor_report(report="tasks")`, then `topvisor_list_keywords`.
 3. Frequencies: same price -> OK -> launch with `kind="volumes"` (base + exact).
 4. Clean: `topvisor_semantics_tools(action="deduplicate")`; drop exact frequency < 10, foreign brands.

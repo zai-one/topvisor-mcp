@@ -2,7 +2,7 @@
 
 ## Unreleased — Semantics and analytics coverage, router eval
 
-- Paid tasks `relevants` and `indexing` (projects_2/tasks) in `topvisor_semantics_price` / `_launch`; every paid launch now also needs an operator-accepted, request-bound approval (`topvisor-approval`).
+- Paid tasks `relevants` and `indexing` (projects_2/tasks) in `topvisor_semantics_price` / `_launch`; every paid `topvisor_semantics_launch` now also needs an operator-accepted, request-bound approval (`topvisor-approval`).
 - `topvisor_competitors_write` (opt-in toolset `competitors_write`): add/del/import, edit name/brand/on/move, approval-gated.
 - Snapshots no longer send or require `region_index` (not in the OpenAPI for snapshots_2); positions summaries still require it.
 
@@ -13,7 +13,7 @@
 - New opt-in toolset `semantics`: `topvisor_semantics_tools` (free deduplicate, cluster_progress), `topvisor_semantics_price` (collect / volumes price) and `topvisor_semantics_launch` (paid; same operator gate as paid rank checks: write enabled, project allowlisted, cost ≤ TOPVISOR_CHECK_MAX_COST, `approved_cost` equals a fresh price, `confirm_cost=true`).
 - Skill `topvisor-semantic-core` (self-contained semantics -> clusters -> positions), guide `topvisor://guide/semantics`, prompt `semantic_core`.
 - Router: one line per intent (RU/EN -> first tool; skill; guide) with `topvisor://playbook` and the generated `topvisor://guide/tool-map` as fallbacks; `TOPVISOR_TOOLSETS=default|all`.
-- `tests/test_routing_eval.py` + `tests/evals/routing_cases.json` (16 RU/EN requests): fails if any tool, skill or guide is unreachable.
+- `tests/test_routing_eval.py` + `tests/evals/routing_cases.json` (20 RU/EN requests incl. paraphrases and negative cases): fails if any tool, skill or guide is unreachable.
 
 ## 0.5.0
 
