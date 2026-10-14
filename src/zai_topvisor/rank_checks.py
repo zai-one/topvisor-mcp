@@ -214,9 +214,11 @@ def reconcile_main(argv=None):
     from zai_topvisor.onboarding import load_config
     from zai_topvisor.policy import PolicyStore
 
-    parser = argparse.ArgumentParser(description="Reconcile a ranking check after inspecting Topvisor")
+    parser = argparse.ArgumentParser(
+        description="Reconcile a ranking check or paid semantics task after inspecting Topvisor"
+    )
     parser.add_argument("--config", required=True)
-    parser.add_argument("--check-id", required=True)
+    parser.add_argument("--check-id", required=True, help="check_id, or task_id of a paid semantics launch")
     parser.add_argument("--outcome", choices=["completed", "not_dispatched"], required=True)
     parser.add_argument("--confirm", action="store_true", required=True)
     args = parser.parse_args(argv)

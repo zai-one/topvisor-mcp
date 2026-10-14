@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import shlex
 from pathlib import Path
 
 import pytest
@@ -17,6 +19,33 @@ from zai_topvisor.semantics import (
     report_payload,
 )
 from zai_topvisor.server import create_server
+
+
+def split_command(command: str) -> list[str]:
+    """Split a command line the way the platform's shell hands it to the program."""
+    if os.name != "nt":
+        return shlex.split(command)
+    import ctypes
+    from ctypes import wintypes
+
+    parse = ctypes.windll.shell32.CommandLineToArgvW
+    parse.argtypes = [wintypes.LPCWSTR, ctypes.POINTER(ctypes.c_int)]
+    parse.restype = ctypes.POINTER(wintypes.LPWSTR)
+    count = ctypes.c_int()
+    argv = parse(command, ctypes.byref(count))
+    try:
+        return [argv[i] for i in range(count.value)]
+    finally:
+        ctypes.windll.kernel32.LocalFree(argv)
+
+
+def operator_accepts(ticket: dict) -> None:
+    """Run the returned operator_command exactly as the operator would (no cwd/env assumptions)."""
+    from zai_topvisor.approvals import main
+
+    argv = split_command(ticket["operator_command"])
+    assert argv[0] == "topvisor-approval"
+    assert main(argv[1:]) == 0
 
 
 def test_report_payloads():
@@ -78,7 +107,6 @@ async def test_competitor_write_needs_operator_approval(tmp_path: Path, monkeypa
     from dataclasses import replace
 
     from zai_topvisor import semantics
-    from zai_topvisor.approvals import ApprovalStore
 
     sent = []
 
@@ -97,7 +125,7 @@ async def test_competitor_write_needs_operator_approval(tmp_path: Path, monkeypa
             await client.call_tool(
                 "topvisor_competitors_write", {**args, "approval_id": ticket["approval_id"]}
             )
-        ApprovalStore(tmp_path / "topvisor-approvals.json").accept(ticket["approval_id"], ticket["digest"])
+        operator_accepts(ticket)
         with pytest.raises(ToolError):
             await client.call_tool(
                 "topvisor_competitors_write", {**args, "ids": [6], "approval_id": ticket["approval_id"]}
@@ -108,7 +136,8 @@ async def test_competitor_write_needs_operator_approval(tmp_path: Path, monkeypa
             )
         ).data
         assert done["applied"] and sent == [
-            ("del/projects_2/competitors", {"project_id": 7, "ids": [5]}, False)
+            ("del/projects_2/competitors", {"project_id": 7, "ids": [5]}, False),
+            ("get/projects_2/competitors", {"project_id": 7, "limit": 100, "offset": 0}, True),
         ]
         with pytest.raises(ToolError):  # single use
             await client.call_tool(
@@ -149,7 +178,6 @@ async def test_paid_launch_needs_matching_price_and_operator_approval(tmp_path: 
     from dataclasses import replace
 
     from zai_topvisor import semantics
-    from zai_topvisor.approvals import ApprovalStore
 
     sent = []
 
@@ -177,7 +205,7 @@ async def test_paid_launch_needs_matching_price_and_operator_approval(tmp_path: 
     async with Client(create_server(config, transport="stdio")) as client:
         ticket = (await client.call_tool("topvisor_semantics_launch", args)).data
         assert ticket["needs_operator_approval"] and sent == ["get/projects_2/tasks/relevants/price"]
-        ApprovalStore(tmp_path / "topvisor-approvals.json").accept(ticket["approval_id"], ticket["digest"])
+        operator_accepts(ticket)
         done = (
             await client.call_tool(
                 "topvisor_semantics_launch", {**args, "approval_id": ticket["approval_id"]}
@@ -191,7 +219,6 @@ async def test_paid_launches_share_the_daily_budget(tmp_path: Path, monkeypatch)
     from dataclasses import replace
 
     from zai_topvisor import semantics
-    from zai_topvisor.approvals import ApprovalStore
 
     sent = []
 
@@ -209,12 +236,11 @@ async def test_paid_launches_share_the_daily_budget(tmp_path: Path, monkeypatch)
         check_daily_budget="3",
     )
     args = {"kind": "volumes", "project_id": 7, "approved_cost": "2", "confirm_cost": True}
-    store = ApprovalStore(tmp_path / "topvisor-approvals.json")
     async with Client(create_server(config, transport="stdio")) as client:
 
         async def approved_launch():
             ticket = (await client.call_tool("topvisor_semantics_launch", args)).data
-            store.accept(ticket["approval_id"], ticket["digest"])
+            operator_accepts(ticket)
             return await client.call_tool(
                 "topvisor_semantics_launch", {**args, "approval_id": ticket["approval_id"]}
             )
@@ -226,57 +252,209 @@ async def test_paid_launches_share_the_daily_budget(tmp_path: Path, monkeypatch)
     assert sent.count("edit/keywords_2/volumes/go") == 1
 
 
-def test_approval_is_bound_to_the_preparing_actor(tmp_path: Path) -> None:
+def _paid_config(tmp_path: Path, **overrides):
+    from dataclasses import replace
+
+    return replace(
+        settings(tmp_path),
+        write_enabled=True,
+        check_projects=frozenset({7, 8}),
+        check_max_cost="5",
+        check_daily_budget="100",
+        **overrides,
+    )
+
+
+def _fake_provider(monkeypatch, sent: list, fail: set | None = None):
+    from zai_topvisor import semantics
+    from zai_topvisor.transport import ProviderTimeoutError
+
+    async def fake_request(runtime, endpoint, payload, *, read=True):
+        sent.append(endpoint)
+        if fail and endpoint in fail:
+            fail.discard(endpoint)
+            raise ProviderTimeoutError("reply lost after dispatch")
+        if endpoint.endswith("/price"):
+            return {"result": "2"}
+        return {"result": {"id": 9}}
+
+    monkeypatch.setattr(semantics, "request", fake_request)
+    monkeypatch.setenv("TOPVISOR_TOOLSETS", "all")
+
+
+INDEXING = {
+    "kind": "indexing",
+    "project_id": 7,
+    "approved_cost": "2",
+    "confirm_cost": True,
+    "urls": ["site.ru/a"],
+}
+
+
+async def _approved(client, tool: str, args: dict) -> dict:
+    ticket = (await client.call_tool(tool, args)).data
+    operator_accepts(ticket)
+    return {**args, "approval_id": ticket["approval_id"]}
+
+
+def test_approval_is_bound_to_account_user_actor_and_request(tmp_path: Path) -> None:
     from zai_topvisor.approvals import ApprovalStore
 
-    store = ApprovalStore(tmp_path / "a.json")
+    db = tmp_path / "state.sqlite"
+    store = ApprovalStore(db, "acct-a", "1")
     ticket = store.prepare("tool", {"x": 1}, "s", actor="alice")
     store.accept(ticket["approval_id"], ticket["digest"])
-    with pytest.raises(PermissionError):
-        store.consume(ticket["approval_id"], "tool", {"x": 1}, actor="mallory")
+    for other, actor, request in (
+        (ApprovalStore(db, "acct-b", "1"), "alice", {"x": 1}),  # another account, same database
+        (ApprovalStore(db, "acct-a", "2"), "alice", {"x": 1}),  # another Topvisor user
+        (store, "mallory", {"x": 1}),
+        (store, "alice", {"x": 2}),
+    ):
+        with pytest.raises(PermissionError):
+            other.consume(ticket["approval_id"], "tool", request, actor=actor)
     store.consume(ticket["approval_id"], "tool", {"x": 1}, actor="alice")
-    with pytest.raises(PermissionError):
+    assert store.consumed_for(ticket["approval_id"], "tool", {"x": 1}, "alice")
+    with pytest.raises(PermissionError):  # single use
         store.consume(ticket["approval_id"], "tool", {"x": 1}, actor="alice")
 
 
-def test_concurrent_prepare_cannot_revive_a_consumed_approval(tmp_path: Path, monkeypatch) -> None:
-    """Regression: an unlocked load-modify-save let a stale prepare() write back a consumed approval."""
-    import threading
-    import time
+async def test_approval_cannot_cross_accounts_sharing_a_directory(tmp_path: Path, monkeypatch) -> None:
+    """Regression: account A's indexing approval authorised spending on account B (shared JSON file)."""
+    sent: list = []
+    _fake_provider(monkeypatch, sent)
+    account_a = _paid_config(tmp_path, state_path=tmp_path / "a.sqlite", account_id="A")
+    account_b = _paid_config(tmp_path, state_path=tmp_path / "b.sqlite", account_id="B")
+    async with Client(create_server(account_a, transport="stdio")) as client:
+        approved = await _approved(client, "topvisor_semantics_launch", INDEXING)
+    async with Client(create_server(account_b, transport="stdio")) as client:
+        with pytest.raises(ToolError):
+            await client.call_tool("topvisor_semantics_launch", approved)
+    assert "add/projects_2/tasks/indexing" not in sent
+
+
+async def test_relevance_and_indexing_approvals_are_bound_to_the_project(tmp_path: Path, monkeypatch) -> None:
+    """Regression: relevants/indexing payloads carry no project_id, so the digest ignored the project."""
+    sent: list = []
+    _fake_provider(monkeypatch, sent)
+    async with Client(create_server(_paid_config(tmp_path), transport="stdio")) as client:
+        approved = await _approved(client, "topvisor_semantics_launch", INDEXING)
+        with pytest.raises(ToolError):
+            await client.call_tool("topvisor_semantics_launch", {**approved, "project_id": 8})
+    assert "add/projects_2/tasks/indexing" not in sent
+
+
+def test_operator_command_targets_the_server_state_database(tmp_path: Path, monkeypatch) -> None:
+    """Regression: operator_command had no --path, so a --config server's approval was not found."""
+    from types import SimpleNamespace
+
+    from zai_topvisor.approvals import ApprovalStore, main
+    from zai_topvisor.semantics import approval_ticket
+
+    state = tmp_path / "with space" / "state.sqlite"
+    runtime = SimpleNamespace(
+        config=SimpleNamespace(state_path=state, account_id="default", user_id="1"),
+        state=SimpleNamespace(get=lambda: SimpleNamespace(actor="local-operator")),
+    )
+    ticket = approval_ticket(runtime, "tool", {"x": 1}, "s")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    monkeypatch.delenv("TOPVISOR_STATE_PATH", raising=False)
+    operator_accepts(ticket)
+    ApprovalStore(state, "default", "1").consume(ticket["approval_id"], "tool", {"x": 1}, "local-operator")
+    # The CLI also resolves the state path from the server's --config, relative to that file.
+    monkeypatch.setenv("TOPVISOR_STATE_PATH", "unused")
+    config = tmp_path / "with space" / "mcp.local.json"
+    config.write_text('{"env": {"TOPVISOR_STATE_PATH": "state.sqlite"}}', encoding="utf-8")
+    second = approval_ticket(runtime, "tool", {"x": 2}, "s")
+    args = ["--config", str(config), "--approval-id", second["approval_id"], "--digest", second["digest"]]
+    assert main([*args, "--accept"]) == 0
+    with pytest.raises(SystemExit):  # never silently creates an empty store elsewhere
+        main(["--path", str(tmp_path / "missing.sqlite"), "--list"])
+
+
+def test_approval_consumption_is_a_durable_sqlite_commit(tmp_path: Path) -> None:
+    """Regression: the JSON approval file was replaced without fsync, so a crash could revive it."""
+    import sqlite3
 
     from zai_topvisor.approvals import ApprovalStore
 
-    store = ApprovalStore(tmp_path / "a.json")
+    state = tmp_path / "state.sqlite"
+    store = ApprovalStore(state, "default", "1")
     ticket = store.prepare("tool", {"x": 1}, "s", actor="me")
     store.accept(ticket["approval_id"], ticket["digest"])
-    loaded, release = threading.Event(), threading.Event()
-    original = ApprovalStore._load
+    store.consume(ticket["approval_id"], "tool", {"x": 1}, actor="me")
+    db = store.connect()
+    assert db.execute("PRAGMA synchronous").fetchone()[0] >= 2  # FULL
+    assert db.execute("PRAGMA journal_mode").fetchone()[0] in {"delete", "truncate", "persist", "wal"}
+    row = sqlite3.connect(state).execute("SELECT consumed FROM approvals").fetchone()
+    assert row[0] is not None and not list(tmp_path.glob("*.json"))
 
-    def slow_load(self):
-        data = original(self)
-        if threading.current_thread().name == "preparer":
-            loaded.set()
-            release.wait(5)
-        return data
 
-    monkeypatch.setattr(ApprovalStore, "_load", slow_load)
-    errors: list[Exception] = []
+async def test_semantics_launch_replays_receipt_and_fences_unknown_outcome(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Regression: after a lost reply a fresh approved copy dispatched the paid task again."""
+    import sqlite3
 
-    def consume() -> None:
-        try:
-            store.consume(ticket["approval_id"], "tool", {"x": 1}, actor="me")
-        except Exception as exc:  # pragma: no cover - surfaced by the assertion below
-            errors.append(exc)
+    from zai_topvisor.check_store import CheckStore
+    from zai_topvisor.policy import PolicyStore
 
-    preparer = threading.Thread(target=lambda: store.prepare("tool", {"y": 2}, "s"), name="preparer")
-    preparer.start()
-    assert loaded.wait(5)
-    consumer = threading.Thread(target=consume)
-    consumer.start()
-    time.sleep(0.2)
-    release.set()
-    preparer.join(5)
-    consumer.join(5)
-    assert errors == []
-    with pytest.raises(PermissionError):
-        store.consume(ticket["approval_id"], "tool", {"x": 1}, actor="me")
+    go = "add/projects_2/tasks/indexing"
+    sent: list = []
+    _fake_provider(monkeypatch, sent, fail={go})
+    config = _paid_config(tmp_path)
+    async with Client(create_server(config, transport="stdio")) as client:
+        lost = await _approved(client, "topvisor_semantics_launch", INDEXING)
+        with pytest.raises(ToolError):
+            await client.call_tool("topvisor_semantics_launch", lost)
+        with pytest.raises(ToolError):  # same approval: outcome unknown, never re-dispatched
+            await client.call_tool("topvisor_semantics_launch", lost)
+        fresh = await _approved(client, "topvisor_semantics_launch", INDEXING)
+        with pytest.raises(ToolError):  # a new approval is fenced too
+            await client.call_tool("topvisor_semantics_launch", fresh)
+        assert sent.count(go) == 1
+        # Operator verifies in Topvisor and reconciles (after the two-minute window).
+        with sqlite3.connect(config.state_path) as db:
+            db.execute("UPDATE paid_tasks SET dispatched=dispatched-300")
+        CheckStore(PolicyStore(config.state_path, config.account_id, 20, 20)).reconcile(
+            lost["approval_id"], "not_dispatched"
+        )
+        done = (await client.call_tool("topvisor_semantics_launch", fresh)).data
+        assert done["submitted"] and done["task_id"] == fresh["approval_id"] and not done["replayed"]
+        replay = (await client.call_tool("topvisor_semantics_launch", fresh)).data
+        assert replay["replayed"] and replay["task_id"] == done["task_id"]
+    assert sent.count(go) == 2
+
+
+async def test_competitor_write_is_not_repeated_after_lost_reply(tmp_path: Path, monkeypatch) -> None:
+    """Regression: competitor writes had no durable operation record; a fresh approval re-sent them."""
+    from dataclasses import replace
+
+    endpoint = "add/projects_2/competitors"
+    sent: list = []
+    _fake_provider(monkeypatch, sent, fail={endpoint})
+    args = {"action": "add", "project_id": 7, "urls": ["x.ru"]}
+    async with Client(create_server(replace(settings(tmp_path), write_enabled=True), transport="stdio")) as c:
+        with pytest.raises(ToolError):
+            await c.call_tool(
+                "topvisor_competitors_write", await _approved(c, "topvisor_competitors_write", args)
+            )
+        with pytest.raises(ToolError):  # pending: unknown outcome is never resubmitted
+            await c.call_tool(
+                "topvisor_competitors_write", await _approved(c, "topvisor_competitors_write", args)
+            )
+        assert sent.count(endpoint) == 1
+        other = {**args, "urls": ["y.ru"]}
+        first = (
+            await c.call_tool(
+                "topvisor_competitors_write", await _approved(c, "topvisor_competitors_write", other)
+            )
+        ).data
+        again = (
+            await c.call_tool(
+                "topvisor_competitors_write", await _approved(c, "topvisor_competitors_write", other)
+            )
+        ).data
+        assert first["applied"] and first["readback"] == {"id": 9} and again == first
+    assert sent.count(endpoint) == 2

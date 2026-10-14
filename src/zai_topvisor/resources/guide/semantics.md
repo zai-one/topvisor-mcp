@@ -16,6 +16,7 @@ Opt-in toolsets: `TOPVISOR_TOOLSETS=default,semantics,analytics` (or `all`). `ki
 Paid launches need the operator gate: `TOPVISOR_WRITE_ENABLED=true`, the project in
 `TOPVISOR_CHECK_PROJECTS`, cost ≤ `TOPVISOR_CHECK_MAX_COST` and the daily `TOPVISOR_CHECK_DAILY_BUDGET`, and `approved_cost` equal to a fresh price; `topvisor_semantics_launch` then returns `approval_id` +
 `operator_command` — the operator (never the agent) accepts it, then repeat the same call with `approval_id`.
+Unknown launch outcome: never retry with a new approval; the project stays blocked until `topvisor-check-reconcile --check-id TASK_ID`.
 Rank checks (`topvisor_check_launch`) need no `approval_id`. Competitor edits: `topvisor_competitors_write` (opt-in `competitors_write`, same approval).
 Other `topvisor_report` values: summary_chart, snapshots_history, snapshots_competitors, competitors,
 audit_summary, indexing_summary, watcher_summary, search_updates (apometr: region_index + date1), bank_history. Summary, chart and snapshot reports need date1 and date2.
