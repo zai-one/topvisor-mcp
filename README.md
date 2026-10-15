@@ -184,6 +184,12 @@ bank history) and `competitors_write` (`topvisor_competitors_write`). Paid `topv
 `TOPVISOR_TOOLSETS=default`, `all` or a comma list (see `topvisor://toolsets`); `TOPVISOR_TOOLS=a,b` adds single tools,
 `TOPVISOR_DISABLED_TOOLS=a,b` removes them, `TOPVISOR_READ_ONLY=1` removes every write/paid tool.
 
+Competitor add uses one `url` per call, with optional `name`, `brand_name`, `service_name`
+(`positions` / `aiTracker`) and `brand_aliases`. For example:
+`topvisor_competitors_write(action="add", project_id=7, url="example.org", name="Example")`.
+Legacy `urls`/`names` accept one item each; multiple items and conflicting scalar/array values are refused
+before approval. Use `brand_name`, never `brand_names`. Prepare a fresh approval after upgrading.
+
 ## Example requests
 
 - Покажи мои проекты Topvisor и регионы проекта X.

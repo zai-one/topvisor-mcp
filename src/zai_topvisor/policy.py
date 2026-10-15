@@ -116,11 +116,27 @@ class PolicyStore:
             db.execute("UPDATE calls SET outcome = ? WHERE execution_id = ?", (outcome, execution_id))
             db.execute("DELETE FROM leases WHERE execution_id = ?", (execution_id,))
 
-    def reserve_write(self, actor: str, key: str, tool: str, digest: str) -> dict[str, Any] | None:
+    def _require_legacy_write_reconciled(
+        self, db: sqlite3.Connection, tool: str, legacy_digest: str | None
+    ) -> None:
+        if legacy_digest is not None and db.execute(
+            "SELECT 1 FROM writes WHERE account=? AND tool=? AND args_hash=? AND status='pending' LIMIT 1",
+            (self.account, tool, legacy_digest),
+        ).fetchone():
+            raise ProviderError("pre-upgrade write is pending manual reconciliation")
+
+    def require_legacy_write_reconciled(self, tool: str, legacy_digest: str | None) -> None:
+        with self.connect() as db:
+            self._require_legacy_write_reconciled(db, tool, legacy_digest)
+
+    def reserve_write(
+        self, actor: str, key: str, tool: str, digest: str, *, legacy_digest: str | None = None
+    ) -> dict[str, Any] | None:
         if not 1 <= len(key) <= 128:
             raise ValueError("idempotency key must contain 1 to 128 characters")
         with self.connect() as db:
             db.execute("BEGIN IMMEDIATE")
+            self._require_legacy_write_reconciled(db, tool, legacy_digest)
             existing = db.execute(
                 "SELECT args_hash, status, result FROM writes "
                 "WHERE account=? AND actor=? AND idempotency_key=?",

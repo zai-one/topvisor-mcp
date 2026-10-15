@@ -26,7 +26,7 @@ from typing import Any, Literal
 from zai_topvisor.adapter import MAX_ID
 from zai_topvisor.approvals import ApprovalStore, valid_id
 from zai_topvisor.rank_checks import amount, units
-from zai_topvisor.transport import ProviderError
+from zai_topvisor.transport import ProviderError, request_hash
 
 READS = {
     "positions_summary": "get/positions_2/summary",
@@ -268,6 +268,19 @@ def _host(value: object, field: str) -> str:
     return text
 
 
+def _competitor_scalar(args: dict[str, Any], field: str, legacy: str) -> Any:
+    if field in args and legacy in args:
+        raise ValueError(f"use {field} or the deprecated single-item {legacy}, not both")
+    if legacy in args:
+        values = args[legacy]
+        if not isinstance(values, list) or len(values) != 1:
+            raise ValueError(f"add accepts one competitor; use {field} (single-item {legacy} only)")
+        if values[0] is None:
+            raise ValueError(f"{legacy} needs one non-null {field}")
+        return values[0]
+    return args.get(field)
+
+
 def competitor_payload(action: str, project_id: int, **a: Any) -> dict[str, Any]:
     """Validate one competitor write per openapi projects_2/competitors."""
     if action not in COMPETITOR_WRITES:
@@ -275,12 +288,23 @@ def competitor_payload(action: str, project_id: int, **a: Any) -> dict[str, Any]
     payload: dict[str, Any] = {"project_id": _id(project_id, "project_id")}
     a = {k: v for k, v in a.items() if v is not None}
     if action == "add":
-        urls = a.get("urls")
-        if not isinstance(urls, list) or not 1 <= len(urls) <= 100:
-            raise ValueError("add needs urls (1-100)")
-        payload["urls"] = [_host(u, "urls") for u in urls]
-        if "names" in a:
-            payload["names"] = phrases(a["names"], 100)
+        allowed = {"url", "urls", "name", "names", "brand_name", "service_name", "brand_aliases"}
+        if a.keys() - allowed:
+            raise ValueError(
+                "unsupported add parameter; use url, name, brand_name, service_name, brand_aliases"
+            )
+        payload["url"] = _host(_competitor_scalar(a, "url", "urls"), "url")
+        name = _competitor_scalar(a, "name", "names")
+        if name is not None:
+            payload["name"] = phrases([name], 1)[0]
+        if "brand_name" in a:
+            payload["brand_name"] = phrases([a["brand_name"]], 1)[0]
+        if "service_name" in a:
+            if not isinstance(a["service_name"], str) or a["service_name"] not in {"positions", "aiTracker"}:
+                raise ValueError("service_name must be positions or aiTracker")
+            payload["service_name"] = a["service_name"]
+        if "brand_aliases" in a:
+            payload["brand_aliases"] = [] if a["brand_aliases"] == [] else phrases(a["brand_aliases"], 100)
         return payload
     if action in {"delete", "enable"}:
         ids = a.get("ids")
@@ -602,13 +626,19 @@ def register_semantics(server: Any, runtime: Any) -> None:
         to_id: int | None = None,
         to_type: Literal["before", "after"] | None = None,
         competitors: str | None = None,
+        url: str | None = None,
+        brand_name: str | None = None,
+        service_name: Literal["positions", "aiTracker"] | None = None,
+        brand_aliases: list[str] | None = None,
         approval_id: str | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
-        """Change project competitors: add urls, delete/enable ids, import CSV, rename, brand (AI answers
+        """Change project competitors: add one url (optional name/brand_name), delete/enable ids, import CSV,
+        rename, brand (AI answers
         name/aliases), move. Needs TOPVISOR_WRITE_ENABLED and an operator approval: the first call
         returns approval_id; repeat with it once accepted. Identical repeats return the stored result
         (pass a new idempotency_key to redo a completed change on purpose).
+        Legacy urls/names accept exactly one item and become scalar fields; never split bulk adds.
         """
         if not runtime.config.write_enabled:
             raise PermissionError("Topvisor writes are disabled by the operator")
@@ -625,10 +655,25 @@ def register_semantics(server: Any, runtime: Any) -> None:
             to_id=to_id,
             to_type=to_type,
             competitors=competitors,
+            url=url,
+            brand_name=brand_name,
+            service_name=service_name,
+            brand_aliases=brand_aliases,
         )
         endpoint = COMPETITOR_WRITES[action]
         tool = "topvisor_competitors_write"
         ticket_request = {"endpoint": endpoint, "payload": payload}
+        legacy_digest = None
+        if action == "add":
+            # Project onto the old request shape, including when new brand/service
+            # metadata is present. Never reopen an unknown legacy add under a new key.
+            legacy = {"project_id": project_id, "urls": [payload["url"]]}
+            if "name" in payload:
+                legacy["names"] = [payload["name"]]
+            legacy_digest = request_hash(
+                {"provider": "topvisor", "tool": tool, "arguments": {"endpoint": endpoint, "payload": legacy}}
+            )
+            runtime.store.require_legacy_write_reconciled(tool, legacy_digest)
         if not approval_id:
             return approval_ticket(runtime, tool, ticket_request, endpoint)
         approvals(runtime).consume(_approval_id(approval_id), tool, ticket_request, runtime.state.get().actor)
@@ -652,5 +697,6 @@ def register_semantics(server: Any, runtime: Any) -> None:
             validate=lambda: None,
             apply_fn=apply,
             readback_fn=readback,
+            legacy_digest=legacy_digest,
         )
         return {"action": action, **written}

@@ -20,3 +20,7 @@ Unknown launch outcome: never retry with a new approval; the project stays block
 Rank checks (`topvisor_check_launch`) need no `approval_id`. Competitor edits: `topvisor_competitors_write` (opt-in `competitors_write`, same approval).
 Other `topvisor_report` values: summary_chart, snapshots_history, snapshots_competitors, competitors,
 audit_summary, indexing_summary, watcher_summary, search_updates (apometr: region_index + date1), bank_history. Summary, chart and snapshot reports need date1 and date2.
+
+Add one competitor: `topvisor_competitors_write(action="add", project_id, url, name, brand_name)`; names are optional.
+AI tracker: `service_name="aiTracker"`, optional `brand_aliases`. Legacy `urls`/`names` accept one item only;
+bulk/conflicting arguments and `brand_names` are refused before approval. Prepare a fresh approval after upgrading.
