@@ -683,6 +683,8 @@ def register_semantics(server: Any, runtime: Any) -> None:
 
         async def readback(_result: Any) -> Any:
             listing = {"project_id": project_id, "limit": 100, "offset": 0}
+            if "service_name" in payload:
+                listing["service_name"] = payload["service_name"]
             return (await request(runtime, READS["competitors"], listing)).get("result")
 
         # Durable idempotency ledger (as for other writes): the operation is reserved as pending

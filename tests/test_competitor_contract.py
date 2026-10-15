@@ -136,7 +136,11 @@ async def test_mcp_add_binds_normalized_scalar_payload_and_preserves_replay(
         ).data
         assert first["applied"] and sent == [
             ("add/projects_2/competitors", expected, False),
-            ("get/projects_2/competitors", {"project_id": 7, "limit": 100, "offset": 0}, True),
+            (
+                "get/projects_2/competitors",
+                {"project_id": 7, "limit": 100, "offset": 0, "service_name": "aiTracker"},
+                True,
+            ),
         ]
         # A fresh accepted ticket for the same normalized request replays the durable receipt.
         scalar = {**args, "url": ADD["url"], "name": ADD["name"]}
@@ -161,15 +165,21 @@ async def test_mcp_add_binds_normalized_scalar_payload_and_preserves_replay(
         {"brand_names": ["Brand"]},
     ],
 )
-async def test_mcp_refuses_legacy_bulk_and_removed_fields_before_approval(tmp_path, monkeypatch, change):
+@pytest.mark.parametrize("transport", ["stdio", "http"])
+async def test_mcp_refuses_legacy_bulk_and_removed_fields_before_approval(
+    tmp_path, monkeypatch, change, transport
+):
     async def no_provider(*args, **kwargs):
         raise AssertionError("invalid add reached provider")
 
     monkeypatch.setattr(semantics, "request", no_provider)
     monkeypatch.setenv("TOPVISOR_TOOLSETS", "all")
     pair = RSAKeyPair.generate()
-    server = create_server(config(tmp_path, pair, write_enabled=True), transport="stdio")
-    async with Client(server) as client:
+    server = create_server(config(tmp_path, pair, write_enabled=True), transport=transport)
+    async with AsyncExitStack() as stack:
+        client = await stack.enter_async_context(
+            Client(server) if transport == "stdio" else connection(server, token(pair))
+        )
         args = {**ADD, **change}
         if "urls" in change:
             args.pop("url")
