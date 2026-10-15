@@ -43,6 +43,8 @@ topvisor-check-reconcile --config /absolute/path/mcp.local.json --check-id RETUR
 
 For a source checkout, prefix it with `uv run --frozen`. Use `not_dispatched` only after establishing that the request was never accepted; this releases the estimated reservation. `completed` retains the reservation for that UTC day. Reconciliation removes the project fence and never contacts Topvisor. It is an operator assertion, not automatic verification. Do not clear the database or change account IDs to repeat an unknown operation. Existing keyword-management operations keep their earlier preview and replay behavior.
 
+Paid semantics launches (`topvisor_semantics_launch`) follow the same rule: the approval ID is the task ID, its estimate is reserved and the approval used in one transaction before dispatch, an unknown outcome blocks further paid tasks for that project, and a replay of an accepted approval returns the stored receipt. Reconcile with the same command and `--check-id TASK_ID`.
+
 ## Русский
 
 ### Сравнение позиций

@@ -10,6 +10,13 @@
 4. **Setup writes** — every write tool previews by default; repeat with `apply=true` only after the user
    confirms the preview. Same `idempotency_key` = same write.
 
+5. **Semantics → clusters → positions** (opt-in `semantics`) — price/launch keyword collection and
+   frequency checks, dedupe, clusters as groups, then a quoted rank check: `topvisor://guide/semantics`,
+   skill `topvisor-semantic-core`.
+6. **Summaries** (opt-in `analytics`) — `topvisor_report`: positions summary/chart, TOP snapshots,
+   competitors, tasks, audit/indexing/watcher, search-engine updates, bank history.
+
 Skills: `topvisor-weekly-report`, `topvisor-rank-check-safe`, `topvisor-competitor-tracking`,
-`seo-weekly-client-report`. Guides: `topvisor://guide/pricing`, `topvisor://guide/report-template`,
-`topvisor://guide/errors`, `topvisor://toolsets`.
+`seo-weekly-client-report`, `topvisor-semantic-core`. Guides: `topvisor://guide/pricing`,
+`topvisor://guide/report-template`, `topvisor://guide/semantics`, `topvisor://guide/errors`,
+`topvisor://guide/tool-map` (every tool by toolset), `topvisor://toolsets`.

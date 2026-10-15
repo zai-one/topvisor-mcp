@@ -32,6 +32,7 @@ from zai_topvisor.policy import PolicyStore
 from zai_topvisor.rank_checks import register_checks
 from zai_topvisor.rank_reports import register_report
 from zai_topvisor.sanitizer import sanitize_provider_response
+from zai_topvisor.semantics import register_semantics
 from zai_topvisor.tools import register_tools
 from zai_topvisor.transport import (
     JsonHttpClient,
@@ -203,6 +204,7 @@ class Runtime:
         validate: Callable[[], Any],
         apply_fn: Callable[[], Awaitable[Any]],
         readback_fn: Callable[[Any], Awaitable[Any]] | None = None,
+        legacy_digest: str | None = None,
     ) -> Any:
         try:
             if not enabled:
@@ -211,7 +213,7 @@ class Runtime:
             digest = request_hash({"provider": provider, "tool": tool, "arguments": arguments})
             key = (idempotency_key.strip() if isinstance(idempotency_key, str) else "") or digest
             actor = self.state.get().actor
-            cached = self.store.reserve_write(actor, key, tool, digest)
+            cached = self.store.reserve_write(actor, key, tool, digest, legacy_digest=legacy_digest)
             if cached is not None:
                 return cached
             # A timeout, failure or cancellation leaves pending durable state.
@@ -283,6 +285,7 @@ def create_server(
     register_tools(registrar, runtime)
     register_report(registrar, runtime)
     register_checks(registrar, runtime)
+    register_semantics(registrar, runtime)
 
     # Registered like every other tool, so it gets the verified actor, a durable execution
     # record and the call deadline. It only talks to GitHub and never uses runtime.topvisor(),

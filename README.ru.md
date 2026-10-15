@@ -27,14 +27,34 @@
 
 ## Почему этот MCP
 
+- Ленивая загрузка инструментов (опционально): `TOPVISOR_TOOL_LOADING=lazy` (или выбор в мастере настройки) — старт с небольшим ядром, наборы включаются по запросу; см. [Ленивая загрузка инструментов](#ленивая-загрузка-инструментов).
 - Чтение использует сохранённые данные и бесплатно; платный съём требует `topvisor_balance` → `topvisor_check_quote` → подтверждения в пределах лимитов проектов и стоимости.
-- Наборы инструментов (meta, positions, ai_tracker, checks, setup_write) и режим только чтения; запись сначала показывается как превью.
+- Наборы инструментов по умолчанию (meta, positions, ai_tracker, checks, setup_write) и режим только чтения; запись сначала показывается как превью. Opt-in: `semantics` (сбор фраз, частотность, проверка релевантности, индексация, дедупликация, прогресс кластеризации), `analytics` (`topvisor_report`) и `competitors_write`. Платные запуски `topvisor_semantics_launch` и изменения конкурентов требуют `approval_id`, подтверждённого оператором вне MCP (`operator_command` из ответа: `topvisor-approval --path STATE_DB --approval-id ID --digest D --accept` или `--config` с файлом настроек сервера; одноразовый, привязан к аккаунту, пользователю Topvisor, вызывающему и точному запросу с проектом, 30 минут, хранится в базе состояния). Платные запуски семантики учитываются в `TOPVISOR_CHECK_DAILY_BUDGET` вместе с платными съёмами позиций; запуск с неизвестным исходом блокирует новые платные задачи проекта до `topvisor-check-reconcile --check-id TASK_ID`, повтор того же approval возвращает сохранённый ответ. Изменения конкурентов проходят через постоянный журнал идемпотентности.
 - Сравнения и выгрузки позиций отличают отсутствующие значения от позиций (JSON/CSV).
 - У других Topvisor MCP на GitHub ([SCom-82/topvisor-mcp](https://github.com/SCom-82/topvisor-mcp), [psilon2000/topvisor-mcp](https://github.com/psilon2000/topvisor-mcp)) нет CI; psilon2000 защищает запись флагом `confirm=true`, но без расчёта цены и лимита бюджета.
 
+Добавление конкурента: `topvisor_competitors_write(action="add", project_id=7, url="example.org", name="Example")`.
+Один конкурент на вызов; опционально `brand_name`, `service_name` (`positions` / `aiTracker`) и `brand_aliases`.
+Прежние `urls`/`names` допустимы только с одним элементом. Массивы с несколькими элементами, конфликтующие
+скалярные/массивные значения и `brand_names` отклоняются до approval. После обновления подготовьте новый approval.
+
+## Ленивая загрузка инструментов
+
+Ленивая загрузка инструментов (опционально): `TOPVISOR_TOOL_LOADING=lazy` стартует с небольшим ядром и `topvisor_enable_toolsets`, остальные наборы включаются по запросу (`tools/list_changed`). Стоимость старта (tools/list + instructions, ≈символы/4): eager ≈5561 токенов, lazy ≈1196 токенов (−78%). По умолчанию `eager` — без изменений; если клиент не поддерживает `tools/list_changed`, оставьте `eager` или переподключитесь после включения. Область: включение действует в пределах MCP-сессии (session visibility FastMCP), включённые одним клиентом наборы не видны другому. HTTP-транспорт здесь stateless (каждый запрос — отдельная сессия), поэтому включение там не сохраняется: для общего HTTP используйте `eager` или `TOPVISOR_TOOLSETS`.
+
+Клиенты и `notifications/tools/list_changed` (проверено по официальной документации, changelog или заявлениям мейнтейнеров, 2026-10):
+
+| Клиент | `tools/list_changed` | Источник |
+|---|---|---|
+| Claude Code | Да (интерактивно: tools, prompts, resources; `-p`/Agent SDK: только tools) | [docs: Dynamic tool updates](https://code.claude.com/docs/en/mcp) |
+| VS Code (GitHub Copilot) | Да (dynamic tool discovery); новые инструменты могут стать доступны агенту только со следующего хода | [docs](https://code.visualstudio.com/api/extension-guides/ai/mcp), [#303012](https://github.com/microsoft/vscode/issues/303012) |
+| Gemini CLI | Да (обновляет реестр инструментов) | [PR #14375](https://github.com/google-gemini/gemini-cli/pull/14375), [PR #21050](https://github.com/google-gemini/gemini-cli/pull/21050) |
+| Cursor | Ненадёжно: регрессия в 3.12.x подтверждена командой Cursor; после включения перезапустите Cursor | [forum](https://forum.cursor.com/t/mcp-server-regression-does-not-reload-tools-disconnect-does-nothing-ignores-mcp-json-changes-etc/166216) |
+| Claude Desktop, Windsurf, Codex CLI, Cline, Zed, Continue | Не проверено: официальных данных нет; используйте `eager` или переподключитесь после включения | — |
+
 ## Поддержка и обновления
 
-- Проект активно поддерживает ZAI.ONE: текущая версия 0.5.0; изменения в [CHANGELOG.md](CHANGELOG.md) и [Releases](https://github.com/zai-one/topvisor-mcp/releases).
+- Проект активно поддерживает ZAI.ONE: текущая версия 0.6.1; изменения в [CHANGELOG.md](CHANGELOG.md) и [Releases](https://github.com/zai-one/topvisor-mcp/releases).
 - Встроенная проверка обновлений: попросите ассистента вызвать `topvisor_check_update` (публичный GitHub API, без учётных данных, с кэшем; ничего не устанавливается автоматически; отключение: `TOPVISOR_DISABLE_UPDATE_CHECK=1`).
 - Следует актуальным практикам MCP: аннотации инструментов (read-only / destructive), наборы инструментов и режим только чтения, `instructions` сервера, промпты и ресурсы, структурированные ошибки с подсказками, секреты не попадают в ответы, бюджет токенов описаний проверяется в тестах.
 - CI прогоняет тесты на Linux и Windows для каждого pull request.

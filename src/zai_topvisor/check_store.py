@@ -18,6 +18,12 @@ class CheckStore:
                 project INTEGER NOT NULL, payload TEXT NOT NULL, cost INTEGER NOT NULL,
                 created REAL NOT NULL, expires REAL NOT NULL, state TEXT NOT NULL,
                 reserved INTEGER NOT NULL DEFAULT 0, dispatched REAL, result TEXT)""")
+            # Other paid launches (semantics: collect, volumes, relevants, indexing) share the
+            # operator's daily estimate budget with rank checks.
+            db.execute("""CREATE TABLE IF NOT EXISTS paid_tasks(
+                id TEXT PRIMARY KEY, account TEXT NOT NULL, actor TEXT NOT NULL,
+                project INTEGER NOT NULL, kind TEXT NOT NULL, cost INTEGER NOT NULL,
+                dispatched REAL NOT NULL, state TEXT NOT NULL, reserved INTEGER NOT NULL, result TEXT)""")
 
     def create(self, actor, project, payload, cost):
         identifier, now = uuid4().hex, time.time()
@@ -62,15 +68,66 @@ class CheckStore:
                 (self.policy.account, row[0]),
             ).fetchone():
                 raise ProviderError("this project has a check awaiting operator reconciliation")
-            total = db.execute(
-                "SELECT COALESCE(SUM(reserved),0) FROM rank_checks WHERE account=? AND dispatched>=?",
-                (self.policy.account, day),
-            ).fetchone()[0]
-            if total + row[1] > daily_budget:
+            if self._spent(db, day) + row[1] > daily_budget:
                 raise PermissionError("daily ranking-check estimate budget exhausted")
             db.execute(
                 "UPDATE rank_checks SET state='dispatching',reserved=cost,dispatched=? WHERE id=?",
                 (now, identifier),
+            )
+
+    def _spent(self, db, day):
+        return sum(
+            db.execute(
+                f"SELECT COALESCE(SUM(reserved),0) FROM {table} WHERE account=? AND dispatched>=?",
+                (self.policy.account, day),
+            ).fetchone()[0]
+            for table in ("rank_checks", "paid_tasks")
+        )
+
+    def claim_task(self, actor, project, kind, cost, daily_budget, *, operation_id=None, consume=None):
+        """Reserve a paid task's estimate against the shared daily budget before dispatch.
+
+        The reservation stays counted even if the dispatch outcome is unknown, and an unresolved
+        (dispatching) task fences further paid tasks for the project until operator reconciliation.
+        ``operation_id`` (the approval ID) is the stable identity of the operation; ``consume(db)``
+        uses the approval in the same durable transaction as the reservation.
+        """
+        identifier = operation_id or uuid4().hex
+        with self.policy.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            now = time.time()
+            day = int(now // 86400) * 86400
+            if db.execute(
+                "SELECT 1 FROM paid_tasks WHERE account=? AND project=? AND state='dispatching' LIMIT 1",
+                (self.policy.account, project),
+            ).fetchone():
+                raise ProviderError("this project has a paid task awaiting operator reconciliation")
+            if self._spent(db, day) + cost > daily_budget:
+                raise PermissionError("daily paid-task estimate budget exhausted")
+            if consume is not None:
+                consume(db)
+            db.execute(
+                "INSERT INTO paid_tasks(id,account,actor,project,kind,cost,dispatched,state,reserved) "
+                "VALUES(?,?,?,?,?,?,?,'dispatching',?)",
+                (identifier, self.policy.account, actor, project, kind, cost, now, cost),
+            )
+        return identifier
+
+    def task(self, actor, identifier):
+        """Stored state and receipt of one paid task of this account and actor, or None."""
+        with self.policy.connect() as db:
+            row = db.execute(
+                "SELECT state,result FROM paid_tasks WHERE id=? AND account=? AND actor=?",
+                (identifier, self.policy.account, actor),
+            ).fetchone()
+        return None if row is None else {"state": row[0], "result": row[1]}
+
+    def task_accepted(self, identifier, result):
+        with self.policy.connect() as db:
+            db.execute(
+                "UPDATE paid_tasks SET state='accepted',result=? "
+                "WHERE id=? AND account=? AND state='dispatching'",
+                (json.dumps(result), identifier, self.policy.account),
             )
 
     def accepted(self, actor, identifier, result):
@@ -84,23 +141,27 @@ class CheckStore:
                 raise ProviderError("rank-check state changed; reconcile before another dispatch")
 
     def reconcile(self, identifier, outcome):
+        """Operator assertion for a rank check or paid task (by check_id / task_id) after inspection."""
         if outcome not in {"completed", "not_dispatched"}:
             raise ValueError("explicit reconciliation outcome required")
         with self.policy.connect() as db:
             db.execute("BEGIN IMMEDIATE")
-            row = db.execute(
-                "SELECT state,dispatched FROM rank_checks WHERE id=? AND account=?",
-                (identifier, self.policy.account),
-            ).fetchone()
+            for table in ("rank_checks", "paid_tasks"):
+                row = db.execute(
+                    f"SELECT state,dispatched FROM {table} WHERE id=? AND account=?",
+                    (identifier, self.policy.account),
+                ).fetchone()
+                if row:
+                    break
             if not row or row[0] not in {"dispatching", "accepted"}:
-                raise ValueError("no unresolved rank check in this account")
+                raise ValueError("no unresolved rank check or paid task in this account")
             # Standalone calls have a 75-second deadline; include IO/clock margin.
             if row[0] == "dispatching" and (row[1] is None or time.time() < row[1] + 120):
                 raise ValueError(
                     "wait at least two minutes after dispatch before reconciling unknown outcome"
                 )
             db.execute(
-                "UPDATE rank_checks SET state=?,reserved=CASE WHEN ?='not_dispatched' THEN 0 "
+                f"UPDATE {table} SET state=?,reserved=CASE WHEN ?='not_dispatched' THEN 0 "
                 "ELSE reserved END WHERE id=? AND account=?",
                 ("reconciled_" + outcome, outcome, identifier, self.policy.account),
             )
