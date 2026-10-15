@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Follow the [single-competitor add contract](https://topvisor.com/ru/api/projects-2/competitors/add/) before 1 November 2026: `topvisor_competitors_write(action="add")` sends scalar `url`, optional `name` and `brand_name`; supports `service_name` (`positions` / `aiTracker`) and `brand_aliases`.
+- Migration: use `url="example.org", name="Example"` instead of `urls=[...], names=[...]`. Deprecated `urls`/`names` remain single-item local aliases; multiple items, conflicting scalar/array arguments and unsupported `brand_names` are rejected before approval or dispatch. Bulk adds are never split into multiple requests; stray add arguments previously ignored are now refused. Other competitor actions are unchanged.
+- Approvals and idempotency bind the normalized scalar request, including brand/service fields. Prepare a fresh approval after upgrading. Matching pending single-item adds from the old journal block the new request across actors/keys within the configured account, including a transactional re-check before reservation. Matching uses normalized URL plus optional name; a changed/omitted name is a different request. Reconcile pending legacy bulk adds before upgrading: the old journal retains hashes, so their individual items cannot be inferred. Old completed receipts keep their old identities; do not replay completed adds as fresh writes. No generic write-reconciliation CLI is introduced.
+
 ## 0.6.0 — Semantics and analytics coverage, router eval
 
 - Upgrade note: `TOPVISOR_TOOLSETS=all` now also enables the new opt-in `semantics`, `analytics` and `competitors_write` toolsets (paid launches and writes still behind operator approval and the daily budget). Unset or `default` keeps the 0.5.0 surface; list toolsets explicitly if you relied on `all` meaning the previous set.

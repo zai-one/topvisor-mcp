@@ -33,6 +33,11 @@
 - Сравнения и выгрузки позиций отличают отсутствующие значения от позиций (JSON/CSV).
 - У других Topvisor MCP на GitHub ([SCom-82/topvisor-mcp](https://github.com/SCom-82/topvisor-mcp), [psilon2000/topvisor-mcp](https://github.com/psilon2000/topvisor-mcp)) нет CI; psilon2000 защищает запись флагом `confirm=true`, но без расчёта цены и лимита бюджета.
 
+Добавление конкурента: `topvisor_competitors_write(action="add", project_id=7, url="example.org", name="Example")`.
+Один конкурент на вызов; опционально `brand_name`, `service_name` (`positions` / `aiTracker`) и `brand_aliases`.
+Прежние `urls`/`names` допустимы только с одним элементом. Массивы с несколькими элементами, конфликтующие
+скалярные/массивные значения и `brand_names` отклоняются до approval. После обновления подготовьте новый approval.
+
 ## Ленивая загрузка инструментов
 
 Ленивая загрузка инструментов (опционально): `TOPVISOR_TOOL_LOADING=lazy` стартует с небольшим ядром и `topvisor_enable_toolsets`, остальные наборы включаются по запросу (`tools/list_changed`). Стоимость старта (tools/list + instructions, ≈символы/4): eager ≈5561 токенов, lazy ≈1196 токенов (−78%). По умолчанию `eager` — без изменений; если клиент не поддерживает `tools/list_changed`, оставьте `eager` или переподключитесь после включения. Область: включение действует в пределах MCP-сессии (session visibility FastMCP), включённые одним клиентом наборы не видны другому. HTTP-транспорт здесь stateless (каждый запрос — отдельная сессия), поэтому включение там не сохраняется: для общего HTTP используйте `eager` или `TOPVISOR_TOOLSETS`.

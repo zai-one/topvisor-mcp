@@ -204,6 +204,7 @@ class Runtime:
         validate: Callable[[], Any],
         apply_fn: Callable[[], Awaitable[Any]],
         readback_fn: Callable[[Any], Awaitable[Any]] | None = None,
+        legacy_digest: str | None = None,
     ) -> Any:
         try:
             if not enabled:
@@ -212,7 +213,7 @@ class Runtime:
             digest = request_hash({"provider": provider, "tool": tool, "arguments": arguments})
             key = (idempotency_key.strip() if isinstance(idempotency_key, str) else "") or digest
             actor = self.state.get().actor
-            cached = self.store.reserve_write(actor, key, tool, digest)
+            cached = self.store.reserve_write(actor, key, tool, digest, legacy_digest=legacy_digest)
             if cached is not None:
                 return cached
             # A timeout, failure or cancellation leaves pending durable state.

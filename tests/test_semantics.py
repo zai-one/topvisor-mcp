@@ -89,7 +89,7 @@ def test_relevants_indexing_and_competitor_payloads_follow_openapi():
     assert indexing == {"indexing_searchers_keys": ["1", "5"], "urls": ["site.ru/a"]}
     with pytest.raises(ValueError):
         paid_payload("indexing", 7)
-    assert competitor_payload("add", 7, urls=["https://x.ru"]) == {"project_id": 7, "urls": ["x.ru"]}
+    assert competitor_payload("add", 7, url="https://x.ru") == {"project_id": 7, "url": "x.ru"}
     assert competitor_payload("enable", 7, ids=[3, 3], on=False) == {"project_id": 7, "ids": [3], "on": -1}
     assert competitor_payload("move", 7, id=3, to_id=4) == {
         "project_id": 7,
@@ -434,7 +434,7 @@ async def test_competitor_write_is_not_repeated_after_lost_reply(tmp_path: Path,
     endpoint = "add/projects_2/competitors"
     sent: list = []
     _fake_provider(monkeypatch, sent, fail={endpoint})
-    args = {"action": "add", "project_id": 7, "urls": ["x.ru"]}
+    args = {"action": "add", "project_id": 7, "url": "x.ru"}
     async with Client(create_server(replace(settings(tmp_path), write_enabled=True), transport="stdio")) as c:
         with pytest.raises(ToolError):
             await c.call_tool(
@@ -445,7 +445,7 @@ async def test_competitor_write_is_not_repeated_after_lost_reply(tmp_path: Path,
                 "topvisor_competitors_write", await _approved(c, "topvisor_competitors_write", args)
             )
         assert sent.count(endpoint) == 1
-        other = {**args, "urls": ["y.ru"]}
+        other = {**args, "url": "y.ru"}
         first = (
             await c.call_tool(
                 "topvisor_competitors_write", await _approved(c, "topvisor_competitors_write", other)

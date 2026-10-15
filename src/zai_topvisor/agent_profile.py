@@ -91,8 +91,8 @@ DESCRIPTIONS = {
     "before `topvisor_semantics_launch`; show the cost. Cost: free.",
     "topvisor_semantics_launch": "Launch a priced paid task once. Use only after the user approved the "
     "exact cost and the operator accepted approval_id. Cost: spends balance.",
-    "topvisor_competitors_write": "Add, delete, import, rename, brand, enable or move project competitors. "
-    "Writes: operator approval_id; TOPVISOR_WRITE_ENABLED.",
+    "topvisor_competitors_write": "Add one competitor (url, name, brand_name) or edit existing competitors. "
+    "Legacy urls/names: one item. Writes: operator approval_id; TOPVISOR_WRITE_ENABLED.",
     "topvisor_check_update": "Check for a newer server release; never installs. Cost: free, 24h cache.",
 }
 
